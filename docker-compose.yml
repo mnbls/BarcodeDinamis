@@ -1,0 +1,51 @@
+# Application + PostgreSQL in containers (NOT executed during development, see the note in Dockerfile).
+#
+#   1. cp .env.example .env    and set at least: APP_URL, SESSION_SECRET, POSTGRES_PASSWORD
+#   2. docker compose up -d --build
+#   3. docker compose exec app node scripts/seed.js        (creates the first admin)
+#
+# The app listens on 127.0.0.1:3000; put Nginx/Caddy in front of it for HTTPS (see deploy/nginx.conf.example).
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-barcode_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di file .env}
+      POSTGRES_DB: ${POSTGRES_DB:-barcode_dinamis}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-barcode_app} -d $${POSTGRES_DB:-barcode_dinamis}']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      APP_URL: ${APP_URL:?isi APP_URL di file .env}
+      SESSION_SECRET: ${SESSION_SECRET:?isi SESSION_SECRET di file .env}
+      # Percent-encode special characters of the password when it goes into a URL.
+      DATABASE_URL: postgres://${POSTGRES_USER:-barcode_app}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-barcode_dinamis}
+      AUTO_MIGRATE: 'true'
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Jakarta}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    volumes:
+      - appdata:/app/storage
+    ports:
+      - '127.0.0.1:3000:3000'
+
+volumes:
+  pgdata:
+  appdata:

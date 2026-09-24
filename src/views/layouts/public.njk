@@ -1,0 +1,17 @@
+{% extends "layouts/base.njk" %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/public.css?v={{ assetVersion }}">
+{% endblock %}
+
+{% block body %}
+<main id="main" tabindex="-1">
+  {% block content %}{% endblock %}
+</main>
+
+<div class="toasts" id="toasts" aria-live="polite" data-flash="{{ flash | dump }}"></div>
+<template id="tpl-icon-success">{{ icon('check-circle', 20) }}</template>
+<template id="tpl-icon-error">{{ icon('warning-circle', 20) }}</template>
+<template id="tpl-icon-info">{{ icon('info', 20) }}</template>
+<template id="tpl-icon-close">{{ icon('x', 16) }}</template>
+{% endblock %}

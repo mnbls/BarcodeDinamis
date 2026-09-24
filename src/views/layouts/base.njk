@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if title %}{{ title }} | {% endif %}{{ app.name }}</title>
+  {% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#fbfbfa">
+  {% block csrfMeta %}{% endblock %}
+  <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/base.css?v={{ assetVersion }}">
+  {% block styles %}{% endblock %}
+</head>
+<body class="{% block bodyClass %}{% endblock %}" {% block bodyAttrs %}{% endblock %}>
+  <a class="skip-link" href="#main">Lewati ke konten</a>
+  {% block body %}{% endblock %}
+  <script src="/assets/js/app.js?v={{ assetVersion }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

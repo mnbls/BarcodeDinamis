@@ -1,0 +1,88 @@
+{% extends "layouts/base.njk" %}
+
+{% macro nav_item(key, active, href, label, iconName) %}
+  <a class="nav__item{% if key == active %} is-active{% endif %}" href="{{ href }}"{% if key == active %} aria-current="page"{% endif %}>
+    {{ icon(iconName, 20) }}<span>{{ label }}</span>
+  </a>
+{% endmacro %}
+
+{% block csrfMeta %}<meta name="csrf-token" content="{{ csrf() }}">{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet" href="/assets/css/admin.css?v={{ assetVersion }}">
+  {% block pageStyles %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Navigasi">
+    <a class="brand" href="/admin">
+      <span class="brand__mark">{{ icon('qr-code', 18) }}</span>
+      <span>{{ app.name }}</span>
+    </a>
+
+    <nav class="nav" aria-label="Menu utama">
+      {{ nav_item('dashboard', nav, '/admin', 'Dashboard', 'squares-four') }}
+      <span class="nav__label">Barcode</span>
+      {{ nav_item('barcodes', nav, '/admin/barcodes', 'Semua Barcode', 'qr-code') }}
+      {% if canWrite %}
+        {{ nav_item('create', nav, '/admin/barcodes/new', 'Buat Barcode', 'plus-circle') }}
+        {{ nav_item('import', nav, '/admin/import', 'Import', 'upload-simple') }}
+      {% endif %}
+      <span class="nav__label">Laporan</span>
+      {{ nav_item('analytics', nav, '/admin/analytics', 'Scan Analytics', 'chart-line-up') }}
+      {{ nav_item('history', nav, '/admin/history', 'Riwayat', 'clock-counter-clockwise') }}
+      <span class="nav__label">Akun</span>
+      {{ nav_item('settings', nav, '/admin/settings', 'Pengaturan', 'gear-six') }}
+    </nav>
+
+    <div class="sidebar__foot">
+      <div class="userbox">
+        <span class="avatar" aria-hidden="true">{{ user.name | first | upper }}</span>
+        <div class="truncate">
+          <div class="userbox__name truncate">{{ user.name }}</div>
+          <div class="userbox__meta truncate">@{{ user.username }} · {{ 'Admin' if user.role == 'admin' else 'Viewer' }}</div>
+        </div>
+      </div>
+      <form method="post" action="/logout">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <button class="btn btn--ghost btn--block btn--start" type="submit">{{ icon('sign-out', 18) }} Keluar</button>
+      </form>
+    </div>
+  </aside>
+  <div class="scrim" data-nav-close></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn--ghost btn--icon" type="button" data-nav-toggle aria-controls="sidebar" aria-label="Buka menu">{{ icon('list', 22) }}</button>
+      <a class="brand" href="/admin"><span class="brand__mark">{{ icon('qr-code', 16) }}</span><span>{{ app.name }}</span></a>
+    </header>
+    <main class="content" id="main" tabindex="-1">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite" data-flash="{{ flash | dump }}"></div>
+
+<template id="tpl-icon-success">{{ icon('check-circle', 20) }}</template>
+<template id="tpl-icon-error">{{ icon('warning-circle', 20) }}</template>
+<template id="tpl-icon-info">{{ icon('info', 20) }}</template>
+<template id="tpl-icon-close">{{ icon('x', 16) }}</template>
+
+<dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+  <div class="dialog__body">
+    <span class="dialog__icon" data-confirm-icon>{{ icon('warning', 22) }}</span>
+    <h2 class="dialog__title" id="confirm-title" data-confirm-title></h2>
+    <p class="dialog__message" id="confirm-message" data-confirm-message></p>
+    <div class="dialog__extra field" data-confirm-extra hidden>
+      <label class="field__label" for="confirm-word-input">Ketik <strong data-confirm-word></strong> untuk melanjutkan</label>
+      <input class="input" id="confirm-word-input" type="text" autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+  <div class="dialog__foot">
+    <button type="button" class="btn btn--secondary" data-confirm-cancel>Batal</button>
+    <button type="button" class="btn btn--primary" data-confirm-ok>Ya, lanjutkan</button>
+  </div>
+</dialog>
+{% endblock %}

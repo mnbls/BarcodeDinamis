@@ -1,0 +1,56 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, stat, pager with context %}
+
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/admin/import">Import</a>{{ icon('caret-right', 12) }}<span>Hasil #{{ batch.id }}</span>
+</nav>
+
+{% call page_header('Hasil import #' ~ batch.id, batch.filename ~ ' · ' ~ (batch.created_at | dt) ~ ' oleh ' ~ (batch.created_by_username or '-')) %}
+  {% if batch.success_count %}
+    <a class="btn btn--secondary" href="/admin/barcodes?batch={{ batch.id }}">{{ icon('qr-code', 18) }} Lihat barcode hasil import</a>
+    <a class="btn btn--secondary" href="/admin/barcodes/export.csv?batch={{ batch.id }}">{{ icon('download-simple', 18) }} Export CSV (dengan kode)</a>
+  {% endif %}
+  <a class="btn btn--primary" href="/admin/import">{{ icon('upload-simple', 18) }} Import lagi</a>
+{% endcall %}
+
+<section class="grid grid--stats-3" aria-label="Ringkasan import">
+  {% call stat('Baris diproses', batch.total_rows | num, 'table') %}Tidak termasuk baris kosong{% endcall %}
+  {% call stat('Berhasil dibuat', batch.success_count | num, 'check-circle') %}
+    {% if batch.first_code %}Kode <span class="mono">{{ batch.first_code }}</span> s/d <span class="mono">{{ batch.last_code }}</span>{% elif batch.success_count %}Kode dibuat acak{% else %}Tidak ada yang dibuat{% endif %}
+  {% endcall %}
+  {% call stat('Gagal', batch.failed_count | num, 'warning-circle') %}
+    {% if batch.failed_count %}Lihat alasan di bawah{% else %}Semua baris valid{% endif %}
+  {% endcall %}
+</section>
+
+{% if batch.failed_count %}
+<section class="card section" aria-labelledby="fail-title">
+  <div class="card__head">
+    <div><h2 class="card__title" id="fail-title">Baris yang gagal ({{ batch.failed_count | num }})</h2><p class="card__sub">Perbaiki di file Anda lalu unggah ulang hanya baris ini. Nomor baris mengikuti spreadsheet (baris 1 adalah judul kolom).</p></div>
+    <a class="btn btn--secondary btn--sm" href="/admin/import/{{ batch.id }}/errors.csv">{{ icon('download-simple', 16) }} Unduh CSV baris gagal</a>
+  </div>
+  <div class="card__body card__body--tbl">
+    <div class="table-wrap">
+      <table class="table table--plain">
+        <thead><tr><th scope="col" class="num">Baris</th><th scope="col">Alasan</th><th scope="col">Nama</th><th scope="col">URL tujuan</th><th scope="col">Status</th></tr></thead>
+        <tbody>
+          {% for e in errors %}
+          <tr>
+            <td class="num nowrap"><strong>{{ e.row }}</strong></td>
+            <td class="wrap-any"><span class="delta delta--down">{{ e.reason }}</span></td>
+            <td class="wrap-any">{{ e.data.name or '-' }}</td>
+            <td class="mono wrap-any">{{ e.data.target_url or '-' }}</td>
+            <td>{{ e.data.status or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ pager(pagination, {}, '/admin/import/' ~ batch.id) }}
+  </div>
+</section>
+{% else %}
+<div class="alert alert--info section">{{ icon('check-circle', 20) }}<div>Semua baris berhasil diimpor. QR Code untuk setiap barcode dapat diunduh dari daftar barcode.</div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "layouts/public.njk" %}
+
+{% block meta %}
+  <meta name="description" content="Kelola barcode dinamis dan ubah tujuan barcode kapan saja tanpa perlu mencetak ulang.">
+  <meta name="robots" content="index, follow">
+{% endblock %}
+
+{% block content %}
+<header class="pub-nav">
+  <div class="pub-nav__inner">
+    <a class="pub-brand" href="/"><span class="pub-brand__mark">{{ icon('qr-code', 18) }}</span><span>{{ app.name }}</span></a>
+    <nav class="pub-links" aria-label="Navigasi utama">
+      <a href="#cara-kerja">Cara kerja</a>
+      <a href="#fitur">Fitur</a>
+      <a href="#faq">Tanya jawab</a>
+      <a class="btn btn--primary btn--sm" href="/login">Login Admin</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero__grid">
+    <div class="hero__copy">
+      <span class="eyebrow"><span class="dot" aria-hidden="true"></span>Barcode dinamis untuk cetak jangka panjang</span>
+      <h1 class="hero__title">Dynamic Barcode <em>Management</em></h1>
+      <p class="hero__lead">Kelola barcode dinamis dan ubah tujuan barcode kapan saja tanpa perlu mencetak ulang.</p>
+      <div class="hero__cta">
+        <a class="btn btn--primary btn--lg" href="/login">Login Admin {{ icon('arrow-right', 18) }}</a>
+        <a class="btn btn--secondary btn--lg" href="#cara-kerja">Lihat cara kerja</a>
+      </div>
+      <p class="hero__note">Dirancang untuk mengelola sedikitnya 10.000 barcode dengan statistik scan per hari.</p>
+    </div>
+
+    <div class="hero__visual" aria-hidden="true">
+      <div class="window">
+        <div class="window__bar"><i></i><i></i><i></i><span>{{ app.url | replace('https://', '') | replace('http://', '') }}/b/BR-000001</span></div>
+        <div class="window__body">
+          <div class="window__qr">
+            <div class="qr-frame">{{ qrSvg | safe }}</div>
+            <span class="window__code">BR-000001</span>
+          </div>
+          <div class="window__info">
+            <div>
+              <h3>Menu Digital Warung Sate</h3>
+              <span class="badge badge--green window__badge">{{ icon('check-circle', 13) }}Aktif</span>
+            </div>
+            <div class="window__row">
+              <small>Alamat di dalam QR (tetap)</small>
+              <span class="mono">{{ app.url }}/b/BR-000001</span>
+            </div>
+            <div class="window__row">
+              <small>Tujuan saat ini</small>
+              <div class="change">
+                <span class="old">instagram.com/akunlama</span>
+                <span class="arrow">{{ icon('arrow-right', 14) }}</span>
+                <span>instagram.com/akunbaru</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="window__foot"><span>QR yang sudah dicetak tetap sama</span><span>1.284 scan</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-pub" id="cara-kerja">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="kicker">Cara kerja</p>
+      <h2>Satu QR Code, tujuan yang bisa diganti.</h2>
+      <p>QR Code tidak menyimpan alamat tujuan. Ia hanya berisi alamat sistem dan kode unik. Tujuan sebenarnya tersimpan di database, sehingga bisa diubah tanpa menyentuh barcode yang sudah terpasang.</p>
+    </div>
+    <div class="steps reveal">
+      <div class="step">
+        <span class="step__no">01</span>
+        <h3>Buat barcode</h3>
+        <p>Isi nama dan tujuan. Sistem membuat kode unik seperti <span class="mono">BR-000001</span> dan QR Code yang mengarah ke <span class="mono">/b/BR-000001</span>.</p>
+      </div>
+      <div class="step">
+        <span class="step__no">02</span>
+        <h3>Cetak sekali</h3>
+        <p>Unduh PNG atau SVG, lalu pasang di kemasan, poster, meja, atau spanduk. Cukup satu kali cetak.</p>
+      </div>
+      <div class="step">
+        <span class="step__no">03</span>
+        <h3>Ubah tujuan kapan saja</h3>
+        <p>Ganti URL dari dashboard. Pemindaian berikutnya langsung diarahkan ke tujuan baru, dan riwayat perubahannya tercatat.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-pub section-pub--tint" id="fitur">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="kicker">Fitur</p>
+      <h2>Semua yang dibutuhkan untuk mengelola ribuan barcode.</h2>
+    </div>
+    <div class="bento">
+      <article class="tile tile--a reveal">
+        <span class="tile__icon tile__icon--blue">{{ icon('chart-line-up', 22) }}</span>
+        <h3>Statistik scan per hari</h3>
+        <p>Total scan, scan hari ini, minggu ini, dan bulan ini, lengkap dengan sebaran perangkat, browser, dan sistem operasi.</p>
+        <div class="tile__viz" aria-hidden="true">
+          <div class="spark"><span style="height:28%"></span><span style="height:40%"></span><span style="height:34%"></span><span style="height:58%"></span><span style="height:52%"></span><span style="height:71%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:76%"></span><span style="height:100%"></span></div>
+        </div>
+      </article>
+      <article class="tile tile--b reveal" style="--i:1">
+        <span class="tile__icon tile__icon--green">{{ icon('upload-simple', 22) }}</span>
+        <h3>Import massal lewat CSV</h3>
+        <p>Unggah file, sistem memvalidasi setiap baris, membuat kode otomatis, lalu melaporkan baris yang gagal beserta alasannya.</p>
+        <div class="tile__viz tile__stat"><strong>10.000</strong><span>barcode dalam satu berkas</span></div>
+      </article>
+      <article class="tile tile--c reveal" style="--i:1">
+        <span class="tile__icon tile__icon--yellow">{{ icon('clock-counter-clockwise', 22) }}</span>
+        <h3>Riwayat perubahan</h3>
+        <p>Setiap pergantian URL tujuan tercatat: kapan, dari mana ke mana, dan oleh admin siapa.</p>
+      </article>
+      <article class="tile tile--d reveal" style="--i:2">
+        <span class="tile__icon tile__icon--red">{{ icon('hourglass', 22) }}</span>
+        <h3>Status dan kedaluwarsa</h3>
+        <p>Nonaktifkan barcode atau beri batas waktu. Pemindai melihat halaman informasi yang jelas.</p>
+      </article>
+      <article class="tile tile--e reveal" style="--i:3">
+        <span class="tile__icon tile__icon--blue">{{ icon('printer', 22) }}</span>
+        <h3>Unduh dan cetak</h3>
+        <p>QR dalam PNG beresolusi tinggi atau SVG vektor, dengan error correction yang aman untuk cetak.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section-pub" id="faq">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="kicker">Tanya jawab</p>
+      <h2>Pertanyaan yang sering muncul.</h2>
+    </div>
+    <div class="faq reveal">
+      <details>
+        <summary>Apa yang terjadi pada QR yang sudah dicetak jika tujuannya diganti? {{ icon('plus', 20) }}</summary>
+        <p>Tidak ada yang perlu dicetak ulang. QR hanya berisi alamat sistem, misalnya <span class="mono">/b/BR-000001</span>. Saat dipindai, sistem membaca tujuan terbaru dari database, sehingga perubahan berlaku seketika.</p>
+      </details>
+      <details>
+        <summary>Berapa banyak barcode yang bisa dikelola? {{ icon('plus', 20) }}</summary>
+        <p>Sistem diuji untuk 10.000 barcode: daftar berhalaman, pencarian terindeks, dan statistik dari rangkuman harian, jadi tetap cepat walaupun scan sudah menumpuk.</p>
+      </details>
+      <details>
+        <summary>Bagaimana jika barcode dinonaktifkan atau kedaluwarsa? {{ icon('plus', 20) }}</summary>
+        <p>Pemindai melihat halaman &quot;Barcode Tidak Aktif&quot; atau &quot;Barcode Sudah Tidak Berlaku&quot; tanpa membuka tujuan. Barcode dapat diaktifkan kembali kapan saja.</p>
+      </details>
+      <details>
+        <summary>Data apa yang dicatat saat barcode dipindai? {{ icon('plus', 20) }}</summary>
+        <p>Waktu, jenis perangkat, browser, sistem operasi, alamat IP, dan sumber rujukan. Data ini dipakai untuk statistik. Alamat IP dapat dianonimkan lewat pengaturan server.</p>
+      </details>
+      <details>
+        <summary>Apakah tujuannya harus berupa website? {{ icon('plus', 20) }}</summary>
+        <p>Tidak. Selain URL, tujuan dapat berupa chat WhatsApp, email, atau nomor telepon.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="section-pub section-pub--flush">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <h2>Siap mengelola barcode Anda?</h2>
+      <a class="btn btn--primary btn--lg" href="/login">Login Admin {{ icon('arrow-right', 18) }}</a>
+    </div>
+  </div>
+</section>
+
+<footer class="pub-footer">
+  <div class="wrap">
+    <span>{{ app.name }} · versi {{ app.version }}</span>
+    <a class="link" href="/login">Login Admin</a>
+  </div>
+</footer>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "layouts/edit-link.njk" %}
+{% from "macros/ui.njk" import badge with context %}
+
+{# INFO page of a public edit link: what this barcode is and where it points now. Read-only, no form.
+   The form lives on its own page (/e/{token}/edit), reached with the button below. #}
+
+{% block editContent %}
+{% set filled = barcode.target_url %}
+
+<h1 class="edit-page__title">Info barcode</h1>
+<p class="edit-page__sub">Anda memegang link edit untuk barcode ini. Dari sini Anda bisa mengisi atau mengubah tujuannya.</p>
+
+<div class="card edit-card">
+  <div class="edit-card__id">
+    <div class="edit-card__qr" aria-hidden="true">{{ qrSvg | safe }}</div>
+    <div class="edit-card__meta">
+      <span class="edit-card__code">{{ barcode.code }}</span>
+      <span class="edit-card__name">{{ barcode.name }}</span>
+      {{ badge(barcode.state) }}
+    </div>
+  </div>
+
+  <div class="edit-card__body">
+    {% if saved == 'yes' %}
+    <div class="alert alert--success" role="status">{{ icon('check-circle', 20) }}<div><strong>Tujuan tersimpan.</strong> QR Code langsung mengarah ke tujuan yang baru.</div></div>
+    {% elif saved == 'same' %}
+    <div class="alert alert--info" role="status">{{ icon('info', 20) }}<div>Tidak ada yang berubah: tujuan sama dengan yang sudah tersimpan.</div></div>
+    {% endif %}
+
+    {% if barcode.state == 'inactive' %}
+    <div class="alert alert--warn">{{ icon('prohibit', 20) }}<div>Barcode ini sedang dinonaktifkan oleh pengelolanya. Tujuan tetap bisa disimpan, tetapi pemindai baru bisa membukanya setelah pengelola mengaktifkan barcode.</div></div>
+    {% elif barcode.state == 'expired' %}
+    <div class="alert alert--warn">{{ icon('hourglass', 20) }}<div>Masa berlaku barcode ini sudah berakhir. Tujuan tetap bisa disimpan, tetapi pemindai baru melihat halaman "Barcode Sudah Tidak Berlaku" sampai pengelola memperpanjangnya.</div></div>
+    {% elif barcode.state == 'pending' %}
+    <div class="alert alert--info">{{ icon('pencil-simple', 20) }}<div>Tujuan barcode ini belum diisi. Sampai tujuan disimpan, pemindai melihat halaman "Barcode Belum Diisi".</div></div>
+    {% endif %}
+
+    <div class="edit-now">
+      <span class="edit-now__label">Tujuan saat ini</span>
+      {% if filled %}
+      <div class="edit-now__value">
+        <span class="edit-now__type">{{ barcode.target_type | typeLabel }}</span>
+        <span class="edit-now__text{% if barcode.target_type != 'url' %} mono{% endif %}" title="{{ barcode.target_url }}">{{ (barcode.target_url | displayUrl) if barcode.target_type == 'url' else current.value }}</span>
+        {% if barcode.target_url.startsWith('http') %}<a class="edit-now__open" href="{{ barcode.target_url }}" target="_blank" rel="noopener noreferrer" aria-label="Buka tujuan di tab baru" title="Buka tujuan">{{ icon('arrow-up-right', 16) }}</a>{% endif %}
+      </div>
+      {% else %}
+      <span class="edit-now__empty">Belum diisi</span>
+      {% endif %}
+    </div>
+
+    <a class="btn btn--primary btn--lg btn--block" href="/e/{{ token }}/edit">{{ icon('pencil-simple', 18) }} {{ 'Ubah tujuan' if filled else 'Isi tujuan' }}</a>
+  </div>
+</div>
+{% endblock %}

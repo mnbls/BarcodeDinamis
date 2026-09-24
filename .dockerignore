@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.*
+!.env.example
+.devdb
+.claude
+storage/logs
+storage/backups
+storage/tmp
+tests
+*.log
+.git
+.vscode
+.idea

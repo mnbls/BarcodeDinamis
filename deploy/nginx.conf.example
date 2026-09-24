@@ -1,0 +1,59 @@
+# Nginx reverse proxy for Dynamic Barcode (save as /etc/nginx/sites-available/barcode, then enable it).
+# HTTPS certificates: sudo certbot --nginx -d barcode.contoh.com
+#
+# In .env set:  APP_URL=https://barcode.contoh.com   TRUST_PROXY=1   NODE_ENV=production
+
+# Optional extra protection for the public scan endpoint (the app also rate-limits per IP).
+limit_req_zone $binary_remote_addr zone=scan:10m rate=20r/s;
+
+# Edit links (/e/{token}) carry a SECRET in the URL: whoever reads it can change that barcode's destination.
+# The app already masks it in its own logs; this keeps it out of nginx's access log as well.
+# (The default "combined" format would print the whole request line.)
+map $request_uri $logged_uri {
+    ~^(?<head>/e/)[^/?]+(?<tail>.*)$   "${head}[redacted]${tail}";
+    default                            $request_uri;
+}
+log_format barcode '$remote_addr - [$time_local] "$request_method $logged_uri" $status $body_bytes_sent "$http_user_agent"';
+
+upstream barcode_app {
+    server 127.0.0.1:3000;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    server_name barcode.contoh.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name barcode.contoh.com;
+
+    # ssl_certificate / ssl_certificate_key are added by certbot.
+
+    client_max_body_size 6m;          # CSV import limit (IMPORT_MAX_UPLOAD_MB) + a little headroom
+    server_tokens off;
+
+    access_log /var/log/nginx/barcode.access.log barcode;   # the redacting format defined above
+
+    location /b/ {
+        limit_req zone=scan burst=60 nodelay;
+        proxy_pass http://barcode_app;
+        include /etc/nginx/proxy_params_barcode;
+    }
+
+    location / {
+        proxy_pass http://barcode_app;
+        include /etc/nginx/proxy_params_barcode;
+    }
+}
+
+# --- /etc/nginx/proxy_params_barcode -------------------------------------------------------------
+# proxy_http_version 1.1;
+# proxy_set_header Connection "";
+# proxy_set_header Host              $host;
+# proxy_set_header X-Real-IP         $remote_addr;
+# proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+# proxy_set_header X-Forwarded-Proto $scheme;
+# proxy_read_timeout 60s;

@@ -1,0 +1,71 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, stat, delta, line_chart, bars, range_bar with context %}
+
+{% block scripts %}<script src="/assets/js/charts.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% block content %}
+{{ page_header('Scan Analytics', 'Statistik pemindaian seluruh barcode. Angka dibaca dari rangkuman harian, jadi tetap cepat walaupun jumlah scan sudah sangat besar.') }}
+
+<section class="grid grid--stats" aria-label="Ringkasan scan">
+  {% call stat('Total scan', totalScans | compact, 'cursor-click') %}Sejak barcode pertama dibuat{% endcall %}
+  {% call stat('Scan hari ini', summary.today | compact, 'lightning') %}
+    {{ delta(((summary.today - summary.yesterday) / summary.yesterday * 100) | round if summary.yesterday else none, 'vs kemarin') }}
+  {% endcall %}
+  {% call stat('Scan minggu ini', summary.this_week | compact, 'calendar-blank') %}Senin sampai hari ini{% endcall %}
+  {% call stat('Scan bulan ini', summary.this_month | compact, 'calendar-blank') %}Tanggal 1 sampai hari ini{% endcall %}
+</section>
+
+<h2 class="section-title">Rentang waktu</h2>
+{{ range_bar(range, rangePresets, '/admin/analytics', true) }}
+
+<section class="card" aria-labelledby="chart-title">
+  <div class="card__head">
+    <div>
+      <h2 class="card__title" id="chart-title">Scan per hari</h2>
+      <p class="card__sub">{{ range.label }} ({{ range.from | date }} s/d {{ range.to | date }})</p>
+    </div>
+  </div>
+  <div class="card__body">
+    <div class="range-hero">
+      <span class="range-hero__value">{{ report.stats.total | num }}</span>
+      <span class="range-hero__unit">scan</span>
+      <span class="range-hero__delta">{{ delta(report.delta, 'vs ' ~ range.days ~ ' hari sebelumnya') }}</span>
+    </div>
+    {% call line_chart('chart-analytics', report.series, 'Scan', 'Scan per hari, ' ~ range.label) %}
+      Rata-rata {{ report.stats.average | round(1) | num }} per hari{% if report.stats.peak %} · puncak {{ report.stats.peak.scans | num }} pada {{ report.stats.peak.day | date }}{% endif %}
+    {% endcall %}
+  </div>
+</section>
+
+<div class="grid grid--breakdown section">
+  <section class="card" aria-labelledby="device-title"><div class="card__head"><div><h2 class="card__title" id="device-title">Perangkat</h2><p class="card__sub">Jenis perangkat pemindai</p></div></div><div class="card__body">{{ bars(report.devices, 'device') }}</div></section>
+  <section class="card" aria-labelledby="browser-title"><div class="card__head"><div><h2 class="card__title" id="browser-title">Browser</h2><p class="card__sub">Aplikasi yang membuka tautan</p></div></div><div class="card__body">{{ bars(report.browsers) }}</div></section>
+  <section class="card" aria-labelledby="os-title"><div class="card__head"><div><h2 class="card__title" id="os-title">Sistem operasi</h2><p class="card__sub">Platform pemindai</p></div></div><div class="card__body">{{ bars(report.systems) }}</div></section>
+</div>
+
+<section class="card section" aria-labelledby="top-title">
+  <div class="card__head"><div><h2 class="card__title" id="top-title">Barcode paling sering dipindai</h2><p class="card__sub">Pada rentang waktu di atas, 10 teratas</p></div></div>
+  <div class="card__body card__body--tbl">
+    {% if report.top | length %}
+    <div class="table-wrap">
+      <table class="table table--plain">
+        <thead><tr><th scope="col" class="num">#</th><th scope="col">Barcode</th><th scope="col">Status</th><th scope="col" class="num">Scan</th><th scope="col" class="num">Porsi</th></tr></thead>
+        <tbody>
+          {% for b in report.top %}
+          <tr>
+            <td class="num muted">{{ loop.index }}</td>
+            <td><a class="cell-name" href="/admin/barcodes/{{ b.code }}">{{ b.name }}</a><span class="cell-sub mono">{{ b.code }}</span></td>
+            <td>{{ 'Aktif' if b.status == 'active' else 'Nonaktif' }}</td>
+            <td class="num"><strong>{{ b.scans | num }}</strong></td>
+            <td class="num muted">{{ b.scans | pct(report.stats.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty empty--sm"><p class="empty__text">Belum ada scan pada rentang waktu ini.</p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "layouts/public.njk" %}
+
+{# mailto: / tel: destinations: browsers do not reliably follow them as HTTP redirects,
+   so this tiny page hands over through a meta refresh with a visible fallback link. #}
+{% block meta %}
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="refresh" content="0;url={{ target }}">
+{% endblock %}
+
+{% block content %}
+<div class="status-page">
+  <div>
+    <div class="card status-card">
+      <span class="status-card__icon status-card__icon--blue">{{ icon('link', 28) }}</span>
+      <h1>Membuka aplikasi...</h1>
+      <p>Jika aplikasi tidak terbuka otomatis, ketuk tombol di bawah.</p>
+      <div class="status-card__actions"><a class="btn btn--primary btn--lg" href="{{ target }}">Buka sekarang</a></div>
+    </div>
+    <p class="status-foot">{{ app.name }}</p>
+  </div>
+</div>
+{% endblock %}

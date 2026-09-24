@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# environment & secrets
+.env
+.env.*
+!.env.example
+
+# runtime data
+storage/logs/*
+storage/backups/*
+storage/tmp/*
+!storage/**/.gitkeep
+*.log
+
+# project-local dev PostgreSQL cluster (scripts/dev-db.ps1)
+.devdb/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+coverage/

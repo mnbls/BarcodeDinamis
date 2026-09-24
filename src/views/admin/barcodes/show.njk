@@ -1,0 +1,228 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, badge, line_chart, bars, delta, copy_button, hidden_csrf, range_bar, history_actor with context %}
+
+{% block scripts %}<script src="/assets/js/charts.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
+
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/admin/barcodes">Semua Barcode</a>{{ icon('caret-right', 12) }}<span class="mono">{{ barcode.code }}</span>
+</nav>
+
+{% call page_header(barcode.name, barcode.description or 'Detail barcode dinamis') %}
+  {% if canWrite %}<a class="btn btn--primary" href="/admin/barcodes/{{ barcode.code }}/edit">{{ icon('pencil-simple', 18) }} Edit Barcode</a>{% endif %}
+  <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/qr.png?download=1">{{ icon('download-simple', 18) }} Download PNG</a>
+  <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/qr.svg?download=1">{{ icon('download-simple', 18) }} Download SVG</a>
+  <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/print" target="_blank" rel="noopener">{{ icon('printer', 18) }} Print</a>
+  {% if canWrite %}
+  <form method="post" action="/admin/barcodes/{{ barcode.code }}/status">
+    {{ hidden_csrf() }}
+    <input type="hidden" name="return_to" value="/admin/barcodes/{{ barcode.code }}">
+    {% if barcode.status == 'active' %}
+      <input type="hidden" name="status" value="inactive">
+      <button class="btn btn--secondary" type="submit" data-confirm data-confirm-title="Nonaktifkan {{ barcode.code }}?" data-confirm-message="Pemindai akan melihat halaman &quot;Barcode Tidak Aktif&quot; sampai barcode diaktifkan kembali. QR Code tidak perlu dicetak ulang." data-confirm-label="Ya, nonaktifkan">{{ icon('power', 18) }} Nonaktifkan</button>
+    {% else %}
+      <input type="hidden" name="status" value="active">
+      <button class="btn btn--secondary" type="submit">{{ icon('power', 18) }} Aktifkan</button>
+    {% endif %}
+  </form>
+  {% endif %}
+{% endcall %}
+
+{% if barcode.state == 'pending' %}
+<div class="alert alert--info mb-16" role="status">
+  {{ icon('pencil-simple', 20) }}
+  <div><strong>Tujuan belum diisi.</strong> Pemindai melihat halaman "Barcode Belum Diisi" sampai tujuan diisi{% if canWrite %}, lewat <a class="link" href="/admin/barcodes/{{ barcode.code }}/edit">form edit</a> atau lewat <a class="link" href="#link-edit">link edit tanpa login</a>{% endif %}.</div>
+</div>
+{% endif %}
+
+<div class="flow" aria-label="Cara kerja barcode ini">
+  <div class="flow__step">
+    <span class="flow__icon">{{ icon('qr-code', 20) }}</span>
+    <div><div class="flow__label">QR Code (yang dicetak)</div><div class="flow__value">Tidak pernah berubah</div></div>
+  </div>
+  <span class="flow__arrow">{{ icon('arrow-right', 18) }}</span>
+  <div class="flow__step">
+    <span class="flow__icon">{{ icon('link', 20) }}</span>
+    <div><div class="flow__label">Alamat di dalam QR</div><div class="flow__value mono" title="{{ redirectUrl }}">{{ redirectUrl }}</div></div>
+  </div>
+  <span class="flow__arrow">{{ icon('arrow-right', 18) }}</span>
+  <div class="flow__step">
+    <span class="flow__icon">{{ icon(typeIcons[barcode.target_type] or 'globe', 20) }}</span>
+    <div>
+      <div class="flow__label">Tujuan saat ini (bisa diubah)</div>
+      {% if barcode.target_url %}<div class="flow__value" title="{{ barcode.target_url }}">{{ barcode.target_url | displayUrl }}</div>
+      {% else %}<div class="flow__value muted">Belum diisi</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="detail">
+  <aside class="card qr-card" aria-label="QR Code">
+    <div class="qr-frame"><img src="/admin/barcodes/{{ barcode.code }}/qr.svg" alt="QR Code untuk {{ barcode.code }}" width="300" height="300"></div>
+    <div class="copy-inline"><span class="qr-code">{{ barcode.code }}</span>{{ copy_button(barcode.code, 'Salin kode', 'Kode disalin.') }}</div>
+    <div class="qr-actions">
+      <a class="btn btn--secondary btn--sm" href="/admin/barcodes/{{ barcode.code }}/qr.png?download=1">{{ icon('download-simple', 16) }} PNG</a>
+      <a class="btn btn--secondary btn--sm" href="/admin/barcodes/{{ barcode.code }}/qr.svg?download=1">{{ icon('download-simple', 16) }} SVG</a>
+      <a class="btn btn--secondary btn--sm btn--wide" href="/admin/barcodes/{{ barcode.code }}/print" target="_blank" rel="noopener">{{ icon('printer', 16) }} Cetak</a>
+    </div>
+    <p class="qr-note">QR berisi alamat sistem, bukan tujuan. Mengubah tujuan tidak membuat QR baru.</p>
+  </aside>
+
+  <div class="grid">
+    {# Only admins get this card (and the server never even reads the link for viewers): the link is a write capability. #}
+    {% if canWrite %}
+    <section class="card" id="link-edit" aria-labelledby="edit-link-title">
+      <div class="card__head">
+        <div>
+          <h2 class="card__title" id="edit-link-title">Link edit tanpa login</h2>
+          <p class="card__sub">Siapa pun yang memegang link ini bisa mengisi atau mengubah tujuan barcode ini, tanpa akun.</p>
+        </div>
+      </div>
+      <div class="card__body">
+        {% if editLink %}
+        <div class="url-box"><span class="mono">{{ editLink }}</span>{{ copy_button(editLink, 'Salin link edit', 'Link edit disalin.') }}</div>
+        <div class="link-actions">
+          <a class="btn btn--secondary btn--sm" href="{{ editLink }}" target="_blank" rel="noopener noreferrer">{{ icon('arrow-up-right', 16) }} Buka halaman edit</a>
+          <form method="post" action="/admin/barcodes/{{ barcode.code }}/edit-link">
+            {{ hidden_csrf() }}
+            <button class="btn btn--secondary btn--sm" type="submit" data-confirm data-confirm-title="Buat ulang link edit?" data-confirm-message="Link yang sekarang langsung tidak berlaku. Orang yang masih memegangnya tidak bisa mengedit lagi, dan Anda perlu membagikan link yang baru." data-confirm-label="Ya, buat ulang">{{ icon('arrow-counter-clockwise', 16) }} Buat ulang link</button>
+          </form>
+          <form method="post" action="/admin/barcodes/{{ barcode.code }}/edit-link/revoke">
+            {{ hidden_csrf() }}
+            <button class="btn btn--danger btn--sm" type="submit" data-confirm data-confirm-variant="danger" data-confirm-title="Cabut link edit?" data-confirm-message="Link ini langsung tidak berlaku, jadi tidak ada lagi yang bisa mengubah tujuan lewat link tersebut. Anda tetap bisa mengedit barcode dari dashboard dan membuat link baru kapan saja." data-confirm-label="Ya, cabut link">{{ icon('x-circle', 16) }} Cabut link</button>
+          </form>
+        </div>
+        <p class="link-note">Pemegang link hanya bisa mengubah tujuan. Nama, status, masa berlaku, statistik, dan penghapusan tetap milik admin. Setiap perubahan tercatat di riwayat dengan keterangan "Link edit". Bagikan hanya kepada orang yang dipercaya.</p>
+        {% else %}
+        <p class="link-note link-note--first">Barcode ini belum punya link edit. Buat satu bila ada orang lain yang perlu mengisi atau mengubah tujuannya tanpa login.</p>
+        <div class="link-actions">
+          <form method="post" action="/admin/barcodes/{{ barcode.code }}/edit-link">
+            {{ hidden_csrf() }}
+            <button class="btn btn--primary btn--sm" type="submit">{{ icon('link', 16) }} Buat link edit</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="card" aria-labelledby="info-title">
+      <div class="card__head"><h2 class="card__title" id="info-title">Informasi</h2>{{ badge(barcode.state) }}</div>
+      <div class="card__body">
+        <dl class="dl">
+          <dt>Kode</dt><dd class="mono">{{ barcode.code }}</dd>
+          <dt>Nama</dt><dd>{{ barcode.name }}</dd>
+          <dt>Tipe tujuan</dt><dd>{{ barcode.target_type | typeLabel }}</dd>
+          <dt>URL tujuan saat ini</dt>
+          <dd>
+            {% if barcode.target_url %}
+            <div class="url-box"><span class="mono">{{ barcode.target_url }}</span>{{ copy_button(barcode.target_url, 'Salin tujuan', 'Tujuan disalin.') }}</div>
+            {% if barcode.target_url.startsWith('http') %}<a class="link text-sm" href="{{ barcode.target_url }}" target="_blank" rel="noopener noreferrer">Buka tujuan {{ icon('arrow-up-right', 12) }}</a>{% endif %}
+            {% else %}<span class="muted">Belum diisi</span>{% endif %}
+          </dd>
+          <dt>Status</dt><dd>{{ badge(barcode.state) }}</dd>
+          <dt>Dibuat</dt><dd>{{ barcode.created_at | dt }}</dd>
+          <dt>Diperbarui</dt><dd>{{ barcode.updated_at | dt }}</dd>
+          <dt>Kedaluwarsa</dt><dd>{% if barcode.expired_at %}{{ barcode.expired_at | dt }}{% else %}<span class="muted">Tidak ada batas waktu</span>{% endif %}</dd>
+          <dt>Scan terakhir</dt><dd>{% if barcode.last_scanned_at %}{{ barcode.last_scanned_at | dt }}{% else %}<span class="muted">Belum pernah dipindai</span>{% endif %}</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="stats-title">
+      <div class="card__head">
+        <div>
+          <h2 class="card__title" id="stats-title">Statistik scan</h2>
+          <p class="card__sub">Dihitung setiap kali QR Code dipindai</p>
+        </div>
+      </div>
+      <div class="card__body">
+        <div class="mini-stats mini-stats--flush">
+          <div><div class="stat__label">Total scan</div><div class="stat__value">{{ barcode.scan_count | num }}</div></div>
+          <div><div class="stat__label">Scan hari ini</div><div class="stat__value">{{ summary.today | num }}</div></div>
+          <div><div class="stat__label">7 hari terakhir</div><div class="stat__value">{{ summary.last7 | num }}</div><div class="stat__sub">{{ delta(((summary.last7 - summary.prev7) / summary.prev7 * 100) | round if summary.prev7 else none, 'vs 7 hari sebelumnya') }}</div></div>
+        </div>
+
+        {{ range_bar(range, rangePresets, '/admin/barcodes/' ~ barcode.code, false) }}
+
+        {% call line_chart('chart-barcode', report.series, 'Scan', 'Scan per hari untuk ' ~ barcode.code) %}
+          Total {{ report.stats.total | num }} scan dalam {{ range.days }} hari{% if report.stats.peak %} · puncak {{ report.stats.peak.scans | num }} pada {{ report.stats.peak.day | date }}{% endif %}
+        {% endcall %}
+
+        <hr class="divider">
+        <div class="breakdowns">
+          <div><h3 class="section-title section-title--flush">Perangkat</h3>{{ bars(report.devices, 'device') }}</div>
+          <div><h3 class="section-title section-title--flush">Browser</h3>{{ bars(report.browsers) }}</div>
+          <div><h3 class="section-title section-title--flush">Sistem operasi</h3>{{ bars(report.systems) }}</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="recent-title">
+      <div class="card__head"><div><h2 class="card__title" id="recent-title">Scan terbaru</h2><p class="card__sub">10 pemindaian terakhir</p></div></div>
+      <div class="card__body card__body--tbl">
+        {% if recent | length %}
+        <div class="table-wrap">
+          <table class="table table--plain">
+            <thead><tr><th scope="col">Waktu</th><th scope="col">Perangkat</th><th scope="col">Browser</th><th scope="col">Sistem</th><th scope="col">IP</th><th scope="col">Sumber</th></tr></thead>
+            <tbody>
+              {% for s in recent %}
+              <tr>
+                <td class="nowrap">{{ s.scanned_at | dt }}</td>
+                <td>{{ s.device | deviceLabel }}</td>
+                <td>{{ s.browser }}</td>
+                <td>{{ s.operating_system }}</td>
+                <td class="mono muted">{{ s.ip_address or '-' }}</td>
+                <td class="muted"><span class="truncate cell-clip" title="{{ s.referer }}">{{ (s.referer | displayUrl) if s.referer else 'Langsung / tidak diketahui' }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="empty empty--sm"><p class="empty__text">Belum ada scan untuk barcode ini.</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card" id="riwayat" aria-labelledby="history-title">
+      <div class="card__head"><div><h2 class="card__title" id="history-title">Riwayat perubahan tujuan</h2><p class="card__sub">Setiap kali URL tujuan diganti, tercatat di sini</p></div></div>
+      <div class="card__body card__body--tbl">
+        {% if history | length %}
+        <div class="table-wrap">
+          <table class="table table--plain">
+            <thead><tr><th scope="col">Waktu</th><th scope="col">URL lama</th><th scope="col">URL baru</th><th scope="col">Diubah oleh</th></tr></thead>
+            <tbody>
+              {% for h in history %}
+              <tr>
+                <td class="nowrap">{{ h.changed_at | dt }}</td>
+                <td class="muted wrap-any">{{ h.old_url or '-' }}</td>
+                <td class="wrap-any">{{ h.new_url }}</td>
+                <td class="muted">{{ history_actor(h) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="empty empty--sm"><p class="empty__text">Tujuan belum pernah diubah sejak barcode dibuat.</p></div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if canWrite %}
+    <section class="card" aria-labelledby="danger-title">
+      <div class="card__head"><div><h2 class="card__title" id="danger-title">Hapus barcode</h2><p class="card__sub">Permanen: QR Code yang sudah tercetak akan menampilkan &quot;Barcode Tidak Ditemukan&quot;. Untuk sementara, cukup nonaktifkan.</p></div></div>
+      <div class="card__body">
+        <form method="post" action="/admin/barcodes/{{ barcode.code }}/delete">
+          {{ hidden_csrf() }}
+          <button class="btn btn--danger" type="submit" data-confirm data-confirm-variant="danger" data-confirm-title="Hapus {{ barcode.code }}?" data-confirm-message="{{ barcode.name }} beserta {{ barcode.scan_count | num }} data scan dan seluruh riwayatnya akan dihapus permanen." data-confirm-label="Ya, hapus permanen">{{ icon('trash', 18) }} Hapus barcode</button>
+        </form>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

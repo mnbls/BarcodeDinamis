@@ -1,0 +1,73 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, field_error, hidden_csrf with context %}
+
+{% block content %}
+{{ page_header('Pengaturan', 'Profil akun, keamanan, dan informasi sistem.') }}
+
+<div class="settings-grid">
+  <section class="card" id="profil" aria-labelledby="profile-title">
+    <div class="card__head"><div><h2 class="card__title" id="profile-title">Profil admin</h2><p class="card__sub">Nama tampil di riwayat perubahan. Anda masuk sebagai {{ 'admin' if user.role == 'admin' else 'viewer (hanya-baca)' }}.</p></div></div>
+    <div class="card__body">
+      <form method="post" action="/admin/settings/profile" novalidate>
+        {{ hidden_csrf() }}
+        <div class="field">
+          <label class="field__label" for="p-name">Nama lengkap</label>
+          <input class="input{% if profileErrors.name %} is-invalid{% endif %}" id="p-name" name="name" type="text" value="{{ profileForm.name }}" maxlength="120" required>
+          {{ field_error(profileErrors, 'name') }}
+        </div>
+        <div class="field">
+          <label class="field__label" for="p-username">Username</label>
+          <input class="input{% if profileErrors.username %} is-invalid{% endif %}" id="p-username" name="username" type="text" value="{{ profileForm.username }}" maxlength="50" autocomplete="username" required>
+          {{ field_error(profileErrors, 'username') }}
+        </div>
+        <div class="field">
+          <label class="field__label" for="p-email">Email</label>
+          <input class="input{% if profileErrors.email %} is-invalid{% endif %}" id="p-email" name="email" type="email" value="{{ profileForm.email }}" maxlength="190" autocomplete="email" required>
+          {{ field_error(profileErrors, 'email') }}
+        </div>
+        <div class="form-actions form-actions--flush"><button class="btn btn--primary" type="submit">Simpan profil</button></div>
+      </form>
+    </div>
+  </section>
+
+  <section class="card" id="password" aria-labelledby="password-title">
+    <div class="card__head"><div><h2 class="card__title" id="password-title">Ganti password</h2><p class="card__sub">Setelah diganti, sesi di perangkat lain otomatis berakhir.</p></div></div>
+    <div class="card__body">
+      <form method="post" action="/admin/settings/password" novalidate>
+        {{ hidden_csrf() }}
+        <div class="field">
+          <label class="field__label" for="pw-current">Password saat ini</label>
+          <input class="input{% if passwordErrors.currentPassword %} is-invalid{% endif %}" id="pw-current" name="currentPassword" type="password" autocomplete="current-password" required>
+          {{ field_error(passwordErrors, 'currentPassword') }}
+        </div>
+        <div class="field">
+          <label class="field__label" for="pw-new">Password baru</label>
+          <input class="input{% if passwordErrors.newPassword %} is-invalid{% endif %}" id="pw-new" name="newPassword" type="password" autocomplete="new-password" minlength="8" required aria-describedby="pw-new-hint">
+          <p class="field__hint" id="pw-new-hint">Minimal 8 karakter, mengandung huruf dan angka.</p>
+          {{ field_error(passwordErrors, 'newPassword') }}
+        </div>
+        <div class="field">
+          <label class="field__label" for="pw-confirm">Ulangi password baru</label>
+          <input class="input{% if passwordErrors.confirmPassword %} is-invalid{% endif %}" id="pw-confirm" name="confirmPassword" type="password" autocomplete="new-password" required>
+          {{ field_error(passwordErrors, 'confirmPassword') }}
+        </div>
+        <div class="form-actions form-actions--flush"><button class="btn btn--primary" type="submit">Ganti password</button></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<section class="card section" id="sistem" aria-labelledby="system-title">
+  <div class="card__head"><div><h2 class="card__title" id="system-title">Sistem</h2><p class="card__sub">Diatur lewat file .env di server. Hanya-baca.</p></div></div>
+  <div class="card__body">
+    {% if system.localhostWarning %}
+    <div class="alert alert--warn mb-16">{{ icon('warning', 20) }}<div>APP_URL masih menunjuk ke localhost. QR Code yang dicetak sekarang tidak akan bisa dipindai dari perangkat lain. Isi APP_URL dengan domain final sebelum mencetak.</div></div>
+    {% endif %}
+    <dl class="kv">
+      {% for item in system.items %}<dt>{{ item[0] }}</dt><dd>{{ item[1] }}</dd>{% endfor %}
+      <dt>Database</dt><dd>{{ system.server.version }}, ukuran {{ system.server.size }}</dd>
+      <dt>Perkiraan jumlah baris</dt><dd>{{ system.approx.barcodes | num }} barcode · {{ system.approx.barcode_scans | num }} log scan · {{ system.approx.barcode_history | num }} riwayat</dd>
+    </dl>
+  </div>
+</section>
+{% endblock %}

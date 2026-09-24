@@ -1,0 +1,180 @@
+{# Reusable UI pieces. Import with:  {% from "macros/ui.njk" import badge, pagination with context %} #}
+
+{% macro badge(state) -%}
+  {%- if state == 'active' -%}
+    <span class="badge badge--green">{{ icon('check-circle', 13) }}Aktif</span>
+  {%- elif state == 'inactive' -%}
+    <span class="badge badge--red">{{ icon('prohibit', 13) }}Nonaktif</span>
+  {%- elif state == 'expired' -%}
+    <span class="badge badge--yellow">{{ icon('hourglass', 13) }}Kedaluwarsa</span>
+  {%- elif state == 'pending' -%}
+    <span class="badge badge--blue">{{ icon('pencil-simple', 13) }}Belum diisi</span>
+  {%- else -%}
+    <span class="badge">{{ state }}</span>
+  {%- endif -%}
+{%- endmacro %}
+
+{# Who changed a destination: a signed-in admin (username), or somebody who only held the edit link (no account). #}
+{% macro history_actor(h) -%}
+  {%- if h.changed_via == 'edit_link' -%}
+    <span class="badge badge--blue">{{ icon('link', 13) }}Link edit</span>{% if h.changed_ip %} <span class="mono text-xs">{{ h.changed_ip }}</span>{% endif %}
+  {%- else -%}
+    {{ h.changed_by_username or '-' }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro page_header(title, subtitle = '') %}
+<header class="page-head">
+  <div>
+    <h1 class="page-title">{{ title }}</h1>
+    {% if subtitle %}<p class="page-sub">{{ subtitle }}</p>{% endif %}
+  </div>
+  {% if caller %}<div class="page-head__actions">{{ caller() }}</div>{% endif %}
+</header>
+{% endmacro %}
+
+{# Stat tile: label, value and an optional caption / delta (caller block). #}
+{% macro stat(label, value, iconName = '', hero = false) %}
+<div class="card stat{% if hero %} stat--hero{% endif %}">
+  <div class="stat__label">{% if iconName %}{{ icon(iconName, 16) }}{% endif %}{{ label }}</div>
+  <div class="stat__value">{{ value }}</div>
+  <div class="stat__sub">{% if caller %}{{ caller() }}{% endif %}</div>
+</div>
+{% endmacro %}
+
+{# Signed change against a named period. Colour = direction, icon + sign repeat it (never colour alone). #}
+{% macro delta(percent, versus) %}
+  {%- if percent is null or percent is undefined -%}
+    <span class="delta delta--flat">{{ versus }}: belum ada pembanding</span>
+  {%- elif percent > 0 -%}
+    <span class="delta delta--up">{{ icon('trend-up', 14) }}+{{ percent }}%</span><span>{{ versus }}</span>
+  {%- elif percent < 0 -%}
+    <span class="delta delta--down">{{ icon('trend-down', 14) }}{{ percent }}%</span><span>{{ versus }}</span>
+  {%- else -%}
+    <span class="delta delta--flat">{{ icon('minus', 14) }}0%</span><span>{{ versus }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{# Numbered pager. `params` = current filters (no page), `path` = base path. #}
+{% macro pager(p, params, path, perPage = 0, perPageOptions = none) %}
+{% if p.total > 0 %}
+<nav class="pager" aria-label="Halaman">
+  <div class="pager__side">
+    <span>{{ p.from | num }}-{{ p.to | num }} dari {{ p.total | num }}</span>
+    {% if perPageOptions %}
+    <form method="get" action="{{ path }}" class="pager__perpage">
+      {% for k, v in params %}{% if v !== '' and v !== none and k != 'per_page' and k != 'page' %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+      <label for="per-page">Baris</label>
+      <select class="select select--auto" id="per-page" name="per_page" data-autosubmit>
+        {% for n in perPageOptions %}<option value="{{ n }}"{% if n == perPage %} selected{% endif %}>{{ n }}</option>{% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+  {% if p.totalPages > 1 %}
+  <ul class="pager__list">
+    <li>
+      {% if p.hasPrev %}<a class="pager__btn" rel="prev" aria-label="Halaman sebelumnya" href="{{ path }}{{ qs(params, {page: (p.page - 1 if p.page > 2 else '')}) }}">{{ icon('caret-left', 14) }}</a>
+      {% else %}<span class="pager__btn is-disabled" aria-hidden="true">{{ icon('caret-left', 14) }}</span>{% endif %}
+    </li>
+    {% for n in p.pages %}
+      {% if n == '...' %}
+        <li><span class="pager__gap" aria-hidden="true">...</span></li>
+      {% else %}
+        <li><a class="pager__btn{% if n == p.page %} is-current{% endif %}" href="{{ path }}{{ qs(params, {page: (n if n > 1 else '')}) }}"{% if n == p.page %} aria-current="page"{% endif %} aria-label="Halaman {{ n }}">{{ n }}</a></li>
+      {% endif %}
+    {% endfor %}
+    <li>
+      {% if p.hasNext %}<a class="pager__btn" rel="next" aria-label="Halaman berikutnya" href="{{ path }}{{ qs(params, {page: p.page + 1}) }}">{{ icon('caret-right', 14) }}</a>
+      {% else %}<span class="pager__btn is-disabled" aria-hidden="true">{{ icon('caret-right', 14) }}</span>{% endif %}
+    </li>
+  </ul>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+{# Sortable table header cell. #}
+{% macro sort_th(key, label, sort, dir, params, path, firstDir = 'asc', cls = '') %}
+<th scope="col" class="{{ cls }}" aria-sort="{{ ('ascending' if dir == 'asc' else 'descending') if sort == key else 'none' }}">
+  <a class="th-sort{% if sort == key %} is-active{% endif %}" href="{{ path }}{{ qs(params, {sort: key, dir: (('desc' if dir == 'asc' else 'asc') if sort == key else firstDir), page: ''}) }}">
+    {{ label }}{% if sort == key %}{{ icon('caret-up' if dir == 'asc' else 'caret-down', 12) }}{% endif %}
+  </a>
+</th>
+{% endmacro %}
+
+{% macro field_error(errors, name) %}
+{% if errors and errors[name] %}<p class="field__error" id="{{ name }}-error">{{ icon('warning-circle', 14) }}<span>{{ errors[name] }}</span></p>{% endif %}
+{% endmacro %}
+
+{# Chart: a real table (the accessible "table view") that charts.js turns into an SVG chart. #}
+{% macro line_chart(id, series, label = 'Scan', caption = '') %}
+<figure class="chart" data-chart="line" data-label="{{ label }}" id="{{ id }}">
+  <div class="chart__canvas"></div>
+  <div class="chart__table">
+    <table class="table table--plain">
+      <caption class="sr-only">{{ caption or (label ~ ' per hari') }}</caption>
+      <thead><tr><th scope="col">Tanggal</th><th scope="col" class="num">{{ label }}</th></tr></thead>
+      <tbody>
+        {% for p in series %}
+        <tr><th scope="row" data-date="{{ p.day }}">{{ p.day | date }}</th><td class="num" data-value="{{ p.scans }}">{{ p.scans | num }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="chart__foot">
+    <span>{% if caller %}{{ caller() }}{% endif %}</span>
+    <button type="button" class="btn btn--ghost btn--sm" data-chart-toggle aria-pressed="false">Lihat tabel</button>
+  </div>
+</figure>
+{% endmacro %}
+
+{# Ranked horizontal bars. items = [{label, scans}] sorted descending. One series = one colour. #}
+{% macro bars(items, labelFilter = '') %}
+{% if items | length %}
+  {% set total = items | sum('scans') %}
+  <div class="bars" role="list">
+    {% for it in items %}
+      {% set exact = (it.scans / total) * 100 %}
+      {% set share = exact | round(0) %}
+      {% set shown = (it.label | deviceLabel) if labelFilter == 'device' else it.label %}
+      <div class="bar-row" role="listitem" tabindex="0" data-tip="{{ shown }}|{{ it.scans | num }}|{{ share }}%">
+        <div class="bar-row__head">
+          <span class="bar-row__label" title="{{ shown }}">{{ shown }}</span>
+          <span class="bar-row__value">{{ it.scans | num }}<span class="bar-row__pct">{{ share }}%</span></span>
+        </div>
+        <div class="bar-row__track"><span class="bar-row__fill" style="--w: {{ exact | round(1) }}"></span></div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="muted text-sm">Belum ada data pada periode ini.</p>
+{% endif %}
+{% endmacro %}
+
+{# Copy-to-clipboard button. #}
+{% macro copy_button(text, label = 'Salin', message = 'Berhasil disalin.') %}
+<button type="button" class="copy-btn" data-copy="{{ text }}" data-copy-message="{{ message }}" aria-label="{{ label }}" title="{{ label }}">{{ icon('copy', 15) }}</button>
+{% endmacro %}
+
+{% macro hidden_csrf() %}<input type="hidden" name="_csrf" value="{{ csrf() }}">{% endmacro %}
+
+{# Date range presets (links) + optional custom range form. Scopes everything below it. #}
+{% macro range_bar(range, presets, path, showCustom = true) %}
+<div class="range-bar">
+  <div class="segmented" role="group" aria-label="Rentang waktu">
+    {% for p in presets %}
+      <a class="seg-link{% if range.key == p.key %} is-active{% endif %}" href="{{ path }}?range={{ p.key }}"{% if range.key == p.key %} aria-current="true"{% endif %}>{{ p.label }}</a>
+    {% endfor %}
+  </div>
+  {% if showCustom %}
+  <form method="get" action="{{ path }}">
+    <input class="input" type="date" name="from" value="{{ range.from }}" aria-label="Dari tanggal" required>
+    <span class="range-bar__label">s/d</span>
+    <input class="input" type="date" name="to" value="{{ range.to }}" aria-label="Sampai tanggal" required>
+    <button class="btn btn--secondary btn--sm" type="submit">Terapkan</button>
+  </form>
+  {% endif %}
+  <span class="range-bar__label">{{ range.label }}</span>
+</div>
+{% endmacro %}

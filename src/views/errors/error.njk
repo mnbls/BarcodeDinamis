@@ -1,0 +1,29 @@
+{% extends layoutFile %}
+
+{% block content %}
+{% if layoutFile == 'layouts/admin.njk' %}
+  <div class="card">
+    <div class="empty">
+      <span class="empty__icon">{{ icon('warning-circle', 24) }}</span>
+      <h1 class="empty__title">{{ title }}</h1>
+      <p class="empty__text">{{ message }}</p>
+      {% if detail %}<pre class="code-block">{{ detail }}</pre>{% endif %}
+      {% if requestId %}<p class="text-xs muted">ID permintaan: <span class="mono">{{ requestId }}</span></p>{% endif %}
+      <a class="btn btn--primary" href="/admin">Kembali ke dashboard</a>
+    </div>
+  </div>
+{% else %}
+  <div class="status-page">
+    <div>
+      <div class="card status-card">
+        <span class="status-card__icon status-card__icon--gray">{{ icon('warning-circle', 28) }}</span>
+        <h1>{{ title }}</h1>
+        <p>{{ message }}</p>
+        {% if requestId %}<span class="status-card__code">{{ requestId }}</span>{% endif %}
+        <div class="status-card__actions"><a class="btn btn--primary" href="/">Kembali ke beranda</a></div>
+      </div>
+      <p class="status-foot">{{ app.name }} · {{ status }}</p>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

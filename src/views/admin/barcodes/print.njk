@@ -1,0 +1,30 @@
+{% extends "layouts/base.njk" %}
+
+{% block styles %}<link rel="stylesheet" href="/assets/css/print.css?v={{ assetVersion }}">{% endblock %}
+{% block bodyAttrs %}data-autoprint="{{ '1' if auto else '0' }}"{% endblock %}
+
+{% block body %}
+<header class="print-toolbar">
+  <span class="print-toolbar__title">Cetak QR {{ barcode.code }}</span>
+  <div class="print-toolbar__group">
+    <span id="size-label">Ukuran QR</span>
+    <div class="segmented" role="radiogroup" aria-labelledby="size-label">
+      <label><input type="radio" name="size" value="3.5cm"><span>Kecil · 3,5 cm</span></label>
+      <label><input type="radio" name="size" value="6cm" checked><span>Sedang · 6 cm</span></label>
+      <label><input type="radio" name="size" value="9cm"><span>Besar · 9 cm</span></label>
+    </div>
+  </div>
+  <button class="btn btn--primary" type="button" data-print>{{ icon('printer', 18) }} Cetak</button>
+  <a class="btn btn--ghost" href="/admin/barcodes/{{ barcode.code }}">Kembali</a>
+</header>
+
+<main class="sheet" id="main" tabindex="-1">
+  <article class="label" data-label>
+    <div class="label__qr"><img src="/admin/barcodes/{{ barcode.code }}/qr.svg" alt="QR Code untuk {{ barcode.code }}"></div>
+    <div class="label__name">{{ barcode.name }}</div>
+    <div class="label__code">{{ barcode.code }}</div>
+    <div class="label__url">{{ redirectUrl }}</div>
+  </article>
+</main>
+<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>
+{% endblock %}

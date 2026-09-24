@@ -1,0 +1,20 @@
+{% extends "layouts/public.njk" %}
+
+{# Shown to people who scan a code that is missing, inactive, expired or not filled in yet.
+   Deliberately reveals nothing about the system, the database or the destination. #}
+{% set tone = { 'not-found': 'blue', 'inactive': 'red', 'expired': 'yellow', 'pending': 'blue' } %}
+{% set glyph = { 'not-found': 'question', 'inactive': 'prohibit', 'expired': 'hourglass', 'pending': 'pencil-simple' } %}
+
+{% block content %}
+<div class="status-page">
+  <div>
+    <div class="card status-card">
+      <span class="status-card__icon status-card__icon--{{ tone[kind] }}">{{ icon(glyph[kind], 28) }}</span>
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+      {% if code %}<span class="status-card__code">{{ code }}</span>{% endif %}
+    </div>
+    <p class="status-foot">{{ app.name }}</p>
+  </div>
+</div>
+{% endblock %}

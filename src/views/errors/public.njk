@@ -1,0 +1,14 @@
+{% extends "layouts/public.njk" %}
+
+{% block content %}
+<div class="status-page">
+  <div>
+    <div class="card status-card">
+      <span class="status-card__icon status-card__icon--gray">{{ icon('warning-circle', 28) }}</span>
+      <h1>{{ title }}</h1>
+      <p>{{ message }}</p>
+    </div>
+    <p class="status-foot">{{ app.name }}</p>
+  </div>
+</div>
+{% endblock %}

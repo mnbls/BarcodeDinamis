@@ -1,0 +1,137 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, field_error, hidden_csrf, copy_button with context %}
+
+{% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
+
+{% block content %}
+{% set currentType = form.target_type or 'url' %}
+{% set meta = targetTypeMeta[currentType] or targetTypeMeta['url'] %}
+{# A destination may be left blank while creating, and while a barcode has never had one. Once filled it stays filled. #}
+{% set targetOptional = (not editing) or (barcode and not barcode.target_url) %}
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <a href="/admin/barcodes">Semua Barcode</a>{{ icon('caret-right', 12) }}
+  {% if editing %}<a class="mono" href="/admin/barcodes/{{ barcode.code }}">{{ barcode.code }}</a>{{ icon('caret-right', 12) }}<span>Edit</span>{% else %}<span>Buat Barcode</span>{% endif %}
+</nav>
+
+{{ page_header('Edit barcode' if editing else 'Buat barcode baru', 'Ubah nama, tujuan, status, atau masa berlaku. QR Code yang sudah dicetak tetap berlaku.' if editing else 'Sistem membuat kode unik dan QR Code. QR hanya berisi alamat sistem, jadi tujuannya bisa diisi atau diganti kapan saja.') }}
+
+{% if errors and (errors | length) %}
+  <div class="alert alert--danger mb-16" role="alert">
+    {{ icon('warning-circle', 20) }}
+    <div>Data belum bisa disimpan. Periksa isian yang ditandai di bawah.</div>
+  </div>
+{% endif %}
+
+<form method="post" action="{{ action }}" novalidate data-type-form data-type-meta="{{ targetTypeMeta | dump }}">
+  {{ hidden_csrf() }}
+  <div class="form-layout">
+    <div class="card form-card">
+
+      <section class="form-section">
+        <h2 class="form-section__title">Informasi barcode</h2>
+        <p class="form-section__sub">Terlihat oleh admin. Nama juga tampil di halaman link edit; keterangan tidak.</p>
+
+        <div class="field">
+          <label class="field__label" for="name">Nama barcode</label>
+          <input class="input{% if errors.name %} is-invalid{% endif %}" id="name" name="name" type="text" value="{{ form.name }}" maxlength="150" required{% if not editing %} autofocus{% endif %} placeholder="Contoh: Menu Digital Warung Sate" aria-describedby="name-error"{% if errors.name %} aria-invalid="true"{% endif %}>
+          {{ field_error(errors, 'name') }}
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="description">Keterangan <span class="optional">(opsional)</span></label>
+          <textarea class="textarea{% if errors.description %} is-invalid{% endif %}" id="description" name="description" rows="3" maxlength="1000" placeholder="Catatan singkat: lokasi pemasangan, kampanye, atau pemilik." aria-describedby="description-error">{{ form.description }}</textarea>
+          {{ field_error(errors, 'description') }}
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2 class="form-section__title">Tujuan</h2>
+        <p class="form-section__sub">Ke mana pemindai diarahkan. {{ 'Boleh dikosongkan dulu dan diisi nanti.' if targetOptional else 'Bagian inilah yang bisa Anda ubah setelah QR dicetak.' }}</p>
+
+        {% if targetOptional %}
+        <div class="alert alert--info mb-16">
+          {{ icon('link', 20) }}
+          <div><strong>Belum tahu tujuannya?</strong> Kosongkan isian di bawah. Setelah barcode dibuat, Anda mendapat link edit yang bisa dikirim ke orang lain: siapa pun yang memegangnya bisa mengisi tujuan tanpa login.</div>
+        </div>
+        {% endif %}
+
+        <div class="field">
+          <span class="field__label" id="type-label">Tipe tujuan</span>
+          <div class="type-grid" role="radiogroup" aria-labelledby="type-label">
+            {% for t, lbl in targetTypeLabels %}
+            <label class="type-option">
+              <input type="radio" name="target_type" value="{{ t }}"{% if currentType == t %} checked{% endif %}>
+              <span>{{ icon(typeIcons[t], 22) }}{{ lbl }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {{ field_error(errors, 'target_type') }}
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="target_value" data-target-label>{{ meta.label }}</label>
+          <input class="input input--mono{% if errors.target_value %} is-invalid{% endif %}" id="target_value" name="target_value" type="text" value="{{ form.target_value }}" placeholder="{{ meta.placeholder }}" inputmode="{{ meta.inputmode }}" autocomplete="off" spellcheck="false" aria-describedby="target_value-hint target_value-error"{% if errors.target_value %} aria-invalid="true"{% endif %}>
+          <p class="field__hint" id="target_value-hint" data-target-hint>{{ meta.hint }}</p>
+          {{ field_error(errors, 'target_value') }}
+        </div>
+
+        <div class="field" data-extra-field{% if not meta.extra %} hidden{% endif %}>
+          <label class="field__label" for="target_extra" data-extra-label>{{ meta.extra.label if meta.extra else 'Tambahan (opsional)' }}</label>
+          <input class="input{% if errors.target_extra %} is-invalid{% endif %}" id="target_extra" name="target_extra" type="text" value="{{ form.target_extra }}" placeholder="{{ meta.extra.placeholder if meta.extra else '' }}" maxlength="500" autocomplete="off" aria-describedby="target_extra-error">
+          <p class="field__hint" data-extra-hint>{{ meta.extra.hint if meta.extra else '' }}</p>
+          {{ field_error(errors, 'target_extra') }}
+        </div>
+      </section>
+
+      <section class="form-section">
+        <h2 class="form-section__title">Status dan masa berlaku</h2>
+        <p class="form-section__sub">Barcode nonaktif atau kedaluwarsa menampilkan halaman informasi kepada pemindai.</p>
+
+        <div class="field-row">
+          <div class="field">
+            <span class="field__label" id="status-label">Status</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="status-label">
+              <label><input type="radio" name="status" value="active"{% if (form.status or 'active') == 'active' %} checked{% endif %}><span>{{ icon('check-circle', 16) }} Aktif</span></label>
+              <label><input type="radio" name="status" value="inactive"{% if form.status == 'inactive' %} checked{% endif %}><span>{{ icon('prohibit', 16) }} Nonaktif</span></label>
+            </div>
+            {{ field_error(errors, 'status') }}
+          </div>
+          <div class="field">
+            <label class="field__label" for="expired_at">Tanggal kedaluwarsa <span class="optional">(opsional)</span></label>
+            <input class="input{% if errors.expired_at %} is-invalid{% endif %}" id="expired_at" name="expired_at" type="datetime-local" value="{{ form.expired_at }}" aria-describedby="expired_at-hint expired_at-error">
+            <p class="field__hint" id="expired_at-hint">Kosongkan bila tidak ada batas waktu. Zona waktu: {{ app.timezone }}.</p>
+            {{ field_error(errors, 'expired_at') }}
+          </div>
+        </div>
+      </section>
+
+      <div class="form-actions">
+        <a class="btn btn--ghost" href="{{ '/admin/barcodes/' ~ barcode.code if editing else '/admin/barcodes' }}">Batal</a>
+        <button class="btn btn--primary" type="submit">{{ icon('check', 18) }} {{ 'Simpan perubahan' if editing else 'Buat barcode' }}</button>
+      </div>
+    </div>
+
+    <aside class="card aside-card" aria-label="Penjelasan">
+      {% if editing %}
+        <h3>QR Code tidak berubah</h3>
+        <p>QR yang sudah tercetak hanya berisi alamat berikut. Yang Anda ubah di sini adalah tujuan di database.</p>
+        <div class="url-box"><span class="mono">{{ redirectUrl }}</span>{{ copy_button(redirectUrl, 'Salin URL QR', 'URL QR disalin.') }}</div>
+        <p>Setiap perubahan URL tujuan dicatat di <a class="link" href="/admin/barcodes/{{ barcode.code }}#riwayat">riwayat barcode</a>.</p>
+        <p>Ingin orang lain yang mengisi tujuan? Bagikan <a class="link" href="/admin/barcodes/{{ barcode.code }}#link-edit">link edit tanpa login</a>.</p>
+      {% else %}
+        <h3>Cara kerjanya</h3>
+        <ol>
+          <li>Sistem membuat kode unik, misalnya <span class="mono">BR-000001</span>.</li>
+          <li>QR Code hanya berisi <span class="mono">{{ app.url }}/b/BR-000001</span>, bukan tujuan Anda.</li>
+          <li>Saat dipindai, sistem membaca tujuan dari database lalu mengarahkan pemindai.</li>
+        </ol>
+        <p>Jadi tujuan bisa diganti kapan saja tanpa mencetak ulang.</p>
+        <p>Tujuan boleh dikosongkan. Barcode tetap dibuat, dan Anda mendapat link edit untuk mengisinya nanti, oleh siapa pun yang Anda beri link itu.</p>
+      {% endif %}
+    </aside>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "layouts/edit-link.njk" %}
+{% from "macros/ui.njk" import field_error with context %}
+
+{# FORM page of a public edit link: only the fields for the destination. Who this barcode is and where it points
+   now are on the info page (/e/{token}); saving returns there. #}
+
+{% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
+
+{% block editContent %}
+{% set currentType = form.target_type or 'url' %}
+{% set meta = targetTypeMeta[currentType] or targetTypeMeta['url'] %}
+{% set filled = barcode.target_url %}
+
+<h1 class="edit-page__title">{{ 'Ubah tujuan barcode' if filled else 'Isi tujuan barcode' }}</h1>
+<p class="edit-page__sub">Tentukan ke mana QR Code ini mengarahkan pemindai. Perubahan langsung berlaku, tanpa perlu mencetak ulang QR.</p>
+
+<div class="card edit-card">
+  <div class="edit-card__ref">
+    <div class="edit-card__refmeta">
+      <span class="edit-card__code">{{ barcode.code }}</span>
+      <span class="edit-card__name">{{ barcode.name }}</span>
+    </div>
+    <a class="edit-back" href="/e/{{ token }}">{{ icon('arrow-left', 14) }} Info barcode</a>
+  </div>
+
+  <div class="edit-card__body">
+    {% if errors and (errors | length) %}
+    <div class="alert alert--danger" role="alert">{{ icon('warning-circle', 20) }}<div>Tujuan belum bisa disimpan. Periksa isian yang ditandai di bawah.</div></div>
+    {% endif %}
+
+    <form class="edit-form" method="post" action="/e/{{ token }}/edit" novalidate data-type-form data-type-meta="{{ targetTypeMeta | dump }}">
+      <div class="field">
+        <span class="field__label" id="type-label">Tipe tujuan</span>
+        <div class="type-grid" role="radiogroup" aria-labelledby="type-label">
+          {% for t, lbl in targetTypeLabels %}
+          <label class="type-option">
+            <input type="radio" name="target_type" value="{{ t }}"{% if currentType == t %} checked{% endif %}>
+            <span>{{ icon(typeIcons[t], 22) }}{{ lbl }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {{ field_error(errors, 'target_type') }}
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="target_value" data-target-label>{{ meta.label }}</label>
+        <input class="input input--mono{% if errors.target_value %} is-invalid{% endif %}" id="target_value" name="target_value" type="text" value="{{ form.target_value }}" placeholder="{{ meta.placeholder }}" inputmode="{{ meta.inputmode }}" autocomplete="off" spellcheck="false"{% if not errors | length %} autofocus{% endif %} aria-describedby="target_value-hint target_value-error"{% if errors.target_value %} aria-invalid="true"{% endif %}>
+        <p class="field__hint" id="target_value-hint" data-target-hint>{{ meta.hint }}</p>
+        {{ field_error(errors, 'target_value') }}
+      </div>
+
+      <div class="field" data-extra-field{% if not meta.extra %} hidden{% endif %}>
+        <label class="field__label" for="target_extra" data-extra-label>{{ meta.extra.label if meta.extra else 'Tambahan (opsional)' }}</label>
+        <input class="input{% if errors.target_extra %} is-invalid{% endif %}" id="target_extra" name="target_extra" type="text" value="{{ form.target_extra }}" placeholder="{{ meta.extra.placeholder if meta.extra else '' }}" maxlength="500" autocomplete="off" aria-describedby="target_extra-error">
+        <p class="field__hint" data-extra-hint>{{ meta.extra.hint if meta.extra else '' }}</p>
+        {{ field_error(errors, 'target_extra') }}
+      </div>
+
+      <div class="edit-actions">
+        <button class="btn btn--primary btn--lg" type="submit">{{ icon('check', 18) }} Simpan tujuan</button>
+        <a class="btn btn--ghost btn--lg" href="/e/{{ token }}">Batal</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "layouts/public.njk" %}
+
+{% block csrfMeta %}<meta name="csrf-token" content="{{ csrf() }}">{% endblock %}
+
+{% block content %}
+<div class="auth">
+  <div class="auth__box">
+    <div class="auth__brand">
+      <a class="pub-brand" href="/"><span class="pub-brand__mark">{{ icon('qr-code', 18) }}</span><span>{{ app.name }}</span></a>
+    </div>
+    <h1 class="auth__title">Masuk ke dashboard</h1>
+    <p class="auth__sub">Halaman ini khusus admin pengelola barcode.</p>
+
+    <div class="card auth__card">
+      {% if error %}
+      <div class="alert alert--danger mb-16" role="alert">{{ icon('warning-circle', 20) }}<div>{{ error }}</div></div>
+      {% endif %}
+      <form method="post" action="/login" autocomplete="on">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="field">
+          <label class="field__label" for="identifier">Username atau email</label>
+          <input class="input" id="identifier" name="identifier" type="text" value="{{ form.identifier }}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">Password</label>
+          <div class="password-wrap">
+            <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+            <button class="password-toggle" type="button" data-toggle-password="password" aria-label="Tampilkan password" aria-pressed="false">{{ icon('eye', 18) }}</button>
+          </div>
+        </div>
+
+        <button class="btn btn--primary btn--lg btn--block auth__submit" type="submit">Masuk</button>
+      </form>
+    </div>
+    <p class="auth__foot"><a href="/">Kembali ke beranda</a></p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,32 @@
+# systemd unit (alternative to PM2). Install:
+#   sudo cp deploy/dynamic-barcode.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now dynamic-barcode
+#
+# Adjust User, WorkingDirectory and the node path (`which node`) for your server.
+[Unit]
+Description=Dynamic Barcode Management
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=barcode
+Group=barcode
+WorkingDirectory=/srv/dynamic-barcode
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/dynamic-barcode/.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/srv/dynamic-barcode/storage
+
+[Install]
+WantedBy=multi-user.target

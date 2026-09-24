@@ -1,0 +1,145 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, stat, delta, line_chart, badge, copy_button, history_actor with context %}
+
+{% block scripts %}<script src="/assets/js/charts.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% block content %}
+{% call page_header('Dashboard', 'Ringkasan barcode dan aktivitas pemindaian.') %}
+  {% if canWrite %}
+    <a class="btn btn--secondary" href="/admin/import">{{ icon('upload-simple', 18) }} Import CSV</a>
+    <a class="btn btn--primary" href="/admin/barcodes/new">{{ icon('plus', 18) }} Buat Barcode</a>
+  {% endif %}
+{% endcall %}
+
+{% if counts.total == 0 %}
+  <div class="card">
+    <div class="empty">
+      <span class="empty__icon">{{ icon('qr-code', 24) }}</span>
+      <h2 class="empty__title">Belum ada barcode</h2>
+      <p class="empty__text">Buat barcode pertama Anda, atau impor banyak sekaligus dari file CSV. QR Code yang dihasilkan tetap sama walaupun tujuannya diubah nanti.</p>
+      {% if canWrite %}
+      <div class="page-head__actions">
+        <a class="btn btn--primary" href="/admin/barcodes/new">{{ icon('plus', 18) }} Buat Barcode</a>
+        <a class="btn btn--secondary" href="/admin/import">{{ icon('upload-simple', 18) }} Import CSV</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+
+<section aria-label="Ringkasan barcode" class="grid grid--stats-5">
+  {% call stat('Total barcode', counts.total | compact, 'qr-code') %}Semua barcode terdaftar{% endcall %}
+  {% call stat('Barcode aktif', counts.active | compact, 'check-circle') %}{{ counts.active | pct(counts.total) }} dari total{% endcall %}
+  {% call stat('Belum diisi', counts.pending | compact, 'pencil-simple') %}
+    {% if counts.pending %}<a class="link" href="/admin/barcodes?status=pending">Lihat daftar</a>{% else %}Tidak ada{% endif %}
+  {% endcall %}
+  {% call stat('Barcode nonaktif', counts.inactive | compact, 'prohibit') %}
+    {% if counts.inactive %}<a class="link" href="/admin/barcodes?status=inactive">Lihat daftar</a>{% else %}Tidak ada{% endif %}
+  {% endcall %}
+  {% call stat('Kedaluwarsa', counts.expired | compact, 'hourglass') %}
+    {% if counts.expired %}<a class="link" href="/admin/barcodes?status=expired">Lihat daftar</a>{% else %}Tidak ada{% endif %}
+  {% endcall %}
+</section>
+
+<section aria-label="Ringkasan scan" class="grid grid--scan section">
+  {% call stat('Jumlah scan', counts.total_scans | compact, 'cursor-click', true) %}
+    Sejak barcode pertama dibuat
+  {% endcall %}
+  {% call stat('Scan hari ini', scans.today | compact, 'lightning') %}
+    {{ delta(((scans.today - scans.yesterday) / scans.yesterday * 100) | round if scans.yesterday else none, 'vs kemarin (' ~ (scans.yesterday | num) ~ ')') }}
+  {% endcall %}
+  {% call stat('Scan 7 hari terakhir', scans.last7 | compact, 'calendar-blank') %}
+    {{ delta(((scans.last7 - scans.prev7) / scans.prev7 * 100) | round if scans.prev7 else none, 'vs 7 hari sebelumnya') }}
+  {% endcall %}
+</section>
+
+<div class="split section">
+  <section class="card" aria-labelledby="chart-title">
+    <div class="card__head">
+      <div>
+        <h2 class="card__title" id="chart-title">Scan per hari</h2>
+        <p class="card__sub">30 hari terakhir, {{ range.from | date }} s/d {{ range.to | date }}</p>
+      </div>
+      <a class="btn btn--ghost btn--sm" href="/admin/analytics">Analitik lengkap {{ icon('arrow-right', 14) }}</a>
+    </div>
+    <div class="card__body">
+      {% call line_chart('chart-dashboard', series, 'Scan', 'Jumlah scan per hari, 30 hari terakhir') %}
+        Total {{ seriesStats.total | num }} scan · rata-rata {{ seriesStats.average | round(1) | num }} per hari{% if seriesStats.peak %} · puncak {{ seriesStats.peak.scans | num }} pada {{ seriesStats.peak.day | date }}{% endif %}
+      {% endcall %}
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="top-title">
+    <div class="card__head">
+      <div>
+        <h2 class="card__title" id="top-title">Paling sering dipindai</h2>
+        <p class="card__sub">Berdasarkan total scan</p>
+      </div>
+    </div>
+    <div class="card__body card__body--tbl">
+      {% if top | length %}
+      <div class="table-wrap">
+        <table class="table table--plain">
+          <thead class="sr-only"><tr><th scope="col">Barcode</th><th scope="col" class="num">Scan</th></tr></thead>
+          <tbody>
+            {% for b in top %}
+            <tr>
+              <td>
+                <a class="cell-name" href="/admin/barcodes/{{ b.code }}" title="{{ b.name }}">{{ b.name }}</a>
+                <span class="cell-sub mono">{{ b.code }}</span>
+              </td>
+              <td class="num"><strong>{{ b.scan_count | num }}</strong></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <div class="empty empty--sm">
+          <p class="empty__text">Belum ada scan. Data muncul begitu QR Code pertama dipindai.</p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="card section" aria-labelledby="changes-title">
+  <div class="card__head">
+    <div>
+      <h2 class="card__title" id="changes-title">Perubahan tujuan terbaru</h2>
+      <p class="card__sub">Riwayat URL tujuan yang diisi atau diganti, oleh admin atau lewat link edit</p>
+    </div>
+    <a class="btn btn--ghost btn--sm" href="/admin/history">Semua riwayat {{ icon('arrow-right', 14) }}</a>
+  </div>
+  <div class="card__body card__body--tbl">
+    {% if changes | length %}
+    <div class="table-wrap">
+      <table class="table table--plain">
+        <thead><tr><th scope="col">Waktu</th><th scope="col">Barcode</th><th scope="col">Perubahan</th><th scope="col">Diubah oleh</th></tr></thead>
+        <tbody>
+          {% for h in changes %}
+          <tr>
+            <td class="nowrap muted">{{ h.changed_at | dt }}</td>
+            <td><a class="code-link" href="/admin/barcodes/{{ h.code }}">{{ h.code }}</a></td>
+            <td>
+              <div class="url-diff">
+                {% if h.old_url %}<span class="url-old">{{ h.old_url | displayUrl }}</span>{% endif %}
+                <span class="url-new">{{ h.new_url | displayUrl }}</span>
+              </div>
+            </td>
+            <td class="muted">{{ history_actor(h) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty empty--sm">
+        <p class="empty__text">Belum ada perubahan tujuan. Ubah URL sebuah barcode dan riwayatnya tercatat di sini.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% endif %}
+{% endblock %}

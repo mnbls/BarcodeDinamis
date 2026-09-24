@@ -1,0 +1,75 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, hidden_csrf with context %}
+
+{% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% block content %}
+{% call page_header('Import barcode', 'Buat banyak barcode sekaligus dari file CSV. Kode dan QR dibuat otomatis oleh sistem; isi file hanya menentukan nama dan tujuan.') %}
+  <a class="btn btn--secondary" href="/admin/import/template.csv">{{ icon('file-arrow-down', 18) }} Unduh template CSV</a>
+{% endcall %}
+
+<div class="split">
+  <section class="card" aria-labelledby="upload-title">
+    <div class="card__head"><div><h2 class="card__title" id="upload-title">Unggah file</h2><p class="card__sub">Maksimal {{ maxRows | num }} baris dan {{ maxMb }} MB per file. Pemisah koma atau titik koma dikenali otomatis.</p></div></div>
+    <div class="card__body">
+      <form method="post" action="/admin/import" enctype="multipart/form-data">
+        {{ hidden_csrf() }}
+        <div class="dropzone" data-dropzone>
+          <span class="dropzone__icon">{{ icon('upload-simple', 22) }}</span>
+          <span class="dropzone__title">Pilih atau tarik file CSV ke sini</span>
+          <span class="dropzone__file" data-dropzone-name>Belum ada file dipilih</span>
+          <input type="file" name="file" accept=".csv,text/csv,text/plain" required aria-label="File CSV">
+        </div>
+        <div class="form-actions form-actions--flush">
+          <button class="btn btn--primary" type="submit" data-import-submit disabled>{{ icon('upload-simple', 18) }} Import sekarang</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="format-title">
+    <div class="card__head"><div><h2 class="card__title" id="format-title">Format file</h2><p class="card__sub">Baris pertama adalah nama kolom.</p></div></div>
+    <div class="card__body">
+      <dl class="spec">
+        <div><dt>name</dt><dd>Wajib. Nama barcode, maks. 150 karakter.</dd></div>
+        <div><dt>target_url</dt><dd>Wajib. Diawali http:// atau https://.</dd></div>
+        <div><dt>description</dt><dd>Opsional. Keterangan, maks. 1000 karakter.</dd></div>
+        <div><dt>status</dt><dd>Opsional. <span class="mono">active</span> (default) atau <span class="mono">inactive</span>.</dd></div>
+        <div><dt>expired_at</dt><dd>Opsional. <span class="mono">2026-12-31</span> atau <span class="mono">31-12-2026 17:00</span>. Tanpa jam berarti akhir hari.</dd></div>
+      </dl>
+      <pre class="code-block">name,description,target_url,status
+Produk A,Produk pertama,https://example.com/a,active
+Produk B,Produk kedua,https://example.com/b,active</pre>
+      <p class="text-sm muted mt-12">Nama kolom berbahasa Indonesia juga dikenali (nama, keterangan, url, kedaluwarsa). Baris yang salah dilewati dan dilaporkan beserta alasannya; baris yang benar tetap diimpor.</p>
+    </div>
+  </section>
+</div>
+
+<section class="card section" aria-labelledby="recent-title">
+  <div class="card__head"><div><h2 class="card__title" id="recent-title">Import terakhir</h2><p class="card__sub">Klik salah satu untuk melihat laporan lengkap</p></div></div>
+  <div class="card__body card__body--tbl">
+    {% if recent | length %}
+    <div class="table-wrap">
+      <table class="table table--plain">
+        <thead><tr><th scope="col">Waktu</th><th scope="col">File</th><th scope="col" class="num">Baris</th><th scope="col" class="num">Berhasil</th><th scope="col" class="num">Gagal</th><th scope="col">Admin</th><th scope="col"><span class="sr-only">Laporan</span></th></tr></thead>
+        <tbody>
+          {% for b in recent %}
+          <tr>
+            <td class="nowrap">{{ b.created_at | dt }}</td>
+            <td><span class="truncate cell-clip">{{ b.filename }}</span></td>
+            <td class="num">{{ b.total_rows | num }}</td>
+            <td class="num">{{ b.success_count | num }}</td>
+            <td class="num">{% if b.failed_count %}<span class="delta delta--down">{{ b.failed_count | num }}</span>{% else %}0{% endif %}</td>
+            <td class="muted">{{ b.created_by_username or '-' }}</td>
+            <td class="num"><a class="btn btn--ghost btn--sm" href="/admin/import/{{ b.id }}">Laporan {{ icon('arrow-right', 14) }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty empty--sm"><p class="empty__text">Belum ada import. Unduh template, isi datanya, lalu unggah di atas.</p></div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

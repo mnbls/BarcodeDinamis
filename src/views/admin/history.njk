@@ -1,0 +1,47 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, pager, history_actor with context %}
+
+{% block content %}
+{{ page_header('Riwayat perubahan', 'Catatan setiap kali URL tujuan barcode diisi atau diganti: kapan, dari mana ke mana, dan oleh siapa (admin, atau orang yang memakai link edit). QR Code yang tercetak tidak ikut berubah.') }}
+
+<section class="card">
+  <form class="toolbar" method="get" action="/admin/history" role="search">
+    <div class="search">
+      {{ icon('magnifying-glass', 18) }}
+      <input class="input" type="search" name="q" value="{{ filters.q }}" placeholder="Cari kode, nama, atau URL" aria-label="Cari riwayat" maxlength="100">
+    </div>
+    <div class="filters">
+      <input class="input" type="date" name="from" value="{{ filters.from }}" aria-label="Dari tanggal" title="Dari tanggal">
+      <input class="input" type="date" name="to" value="{{ filters.to }}" aria-label="Sampai tanggal" title="Sampai tanggal">
+      <button class="btn btn--secondary" type="submit">Terapkan</button>
+      {% if filters.q or filters.from or filters.to %}<a class="btn btn--ghost" href="/admin/history">Reset</a>{% endif %}
+    </div>
+  </form>
+
+  {% if rows | length %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th scope="col">Waktu</th><th scope="col">Barcode</th><th scope="col">URL lama</th><th scope="col">URL baru</th><th scope="col">Diubah oleh</th></tr></thead>
+      <tbody>
+        {% for h in rows %}
+        <tr>
+          <td class="nowrap">{{ h.changed_at | dt }}</td>
+          <td><a class="code-link" href="/admin/barcodes/{{ h.code }}">{{ h.code }}</a><span class="cell-sub" title="{{ h.name }}">{{ h.name }}</span></td>
+          <td class="muted wrap-any">{{ h.old_url or '-' }}</td>
+          <td class="wrap-any">{{ h.new_url }}</td>
+          <td class="muted">{{ history_actor(h) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pager(pagination, baseParams, '/admin/history', perPage, perPageOptions) }}
+  {% else %}
+  <div class="empty">
+    <span class="empty__icon">{{ icon('clock-counter-clockwise', 24) }}</span>
+    <h2 class="empty__title">{{ 'Tidak ada riwayat yang cocok' if (filters.q or filters.from or filters.to) else 'Belum ada perubahan tujuan' }}</h2>
+    <p class="empty__text">{{ 'Coba ubah kata kunci atau rentang tanggal.' if (filters.q or filters.from or filters.to) else 'Begitu URL tujuan sebuah barcode diganti, riwayatnya muncul di sini.' }}</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

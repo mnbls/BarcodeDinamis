@@ -1,0 +1,176 @@
+{% extends "layouts/admin.njk" %}
+{% from "macros/ui.njk" import page_header, badge, pager, sort_th, hidden_csrf with context %}
+
+{% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
+
+{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
+
+{% block content %}
+{% call page_header('Semua Barcode', (total | num) ~ ' barcode' ~ (' cocok dengan filter' if hasFilters else ' terdaftar') ~ '. Cari, ubah tujuan, unduh QR, atau lakukan aksi massal.') %}
+  <details class="menu">
+    <summary class="btn btn--secondary">{{ icon('download-simple', 18) }} Export CSV {{ icon('caret-down', 14) }}</summary>
+    <div class="menu__panel">
+      <div class="menu__label">{{ 'Sesuai filter' if hasFilters else 'Semua barcode' }}</div>
+      <a class="menu__item" href="/admin/barcodes/export.csv{{ qs(filters) }}">{{ icon('file-csv', 18) }} Pemisah koma (,)</a>
+      <a class="menu__item" href="/admin/barcodes/export.csv{{ qs(filters, {sep: 'semicolon'}) }}">{{ icon('file-csv', 18) }} Titik koma (;) untuk Excel</a>
+    </div>
+  </details>
+  {% if canWrite %}
+    <a class="btn btn--secondary" href="/admin/import">{{ icon('upload-simple', 18) }} Import</a>
+    <a class="btn btn--primary" href="/admin/barcodes/new">{{ icon('plus', 18) }} Buat Barcode</a>
+  {% endif %}
+{% endcall %}
+
+<section class="card">
+  <form class="toolbar" method="get" action="/admin/barcodes" role="search">
+    <div class="search">
+      {{ icon('magnifying-glass', 18) }}
+      <input class="input" type="search" name="q" value="{{ filters.q }}" placeholder="Cari nama, kode, atau URL tujuan" aria-label="Cari barcode" maxlength="100">
+    </div>
+    <div class="filters">
+      <select class="select" name="status" aria-label="Filter status" data-autosubmit>
+        <option value="">Semua status</option>
+        <option value="active"{% if filters.status == 'active' %} selected{% endif %}>Aktif</option>
+        <option value="pending"{% if filters.status == 'pending' %} selected{% endif %}>Belum diisi</option>
+        <option value="inactive"{% if filters.status == 'inactive' %} selected{% endif %}>Nonaktif</option>
+        <option value="expired"{% if filters.status == 'expired' %} selected{% endif %}>Kedaluwarsa</option>
+      </select>
+      <input class="input" type="date" name="from" value="{{ filters.from }}" aria-label="Dibuat dari tanggal" title="Dibuat dari tanggal">
+      <input class="input" type="date" name="to" value="{{ filters.to }}" aria-label="Dibuat sampai tanggal" title="Dibuat sampai tanggal">
+      <button class="btn btn--secondary" type="submit">Terapkan</button>
+      {% if hasFilters %}<a class="btn btn--ghost" href="/admin/barcodes">Reset</a>{% endif %}
+    </div>
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="dir" value="{{ dir }}">
+    {% if filters.batch %}<input type="hidden" name="batch" value="{{ filters.batch }}">{% endif %}
+  </form>
+
+  {% if hasFilters %}
+  <div class="chips" aria-label="Filter aktif">
+    <span>Filter:</span>
+    {% if filters.q %}<span class="chip">Kata kunci: {{ filters.q }}<a href="/admin/barcodes{{ qs(baseParams, {q: '', page: ''}) }}" aria-label="Hapus filter kata kunci">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if filters.status %}<span class="chip">Status: {{ filters.status | stateLabel }}<a href="/admin/barcodes{{ qs(baseParams, {status: '', page: ''}) }}" aria-label="Hapus filter status">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if filters.from %}<span class="chip">Dari {{ filters.from | date }}<a href="/admin/barcodes{{ qs(baseParams, {from: '', page: ''}) }}" aria-label="Hapus filter tanggal awal">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if filters.to %}<span class="chip">Sampai {{ filters.to | date }}<a href="/admin/barcodes{{ qs(baseParams, {to: '', page: ''}) }}" aria-label="Hapus filter tanggal akhir">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if filters.batch %}<span class="chip">Hasil import #{{ filters.batch }}<a href="/admin/barcodes{{ qs(baseParams, {batch: '', page: ''}) }}" aria-label="Hapus filter import">{{ icon('x', 12) }}</a></span>{% endif %}
+  </div>
+  {% endif %}
+
+  {# Bulk selection: checkboxes and the buttons below reference this form through the "form" attribute. #}
+  <form id="bulk-form" method="post" action="/admin/barcodes/bulk" data-total="{{ total }}">
+    {{ hidden_csrf() }}
+    <input type="hidden" name="return_to" value="{{ returnTo }}">
+    <input type="hidden" name="select_all_matching" value="">
+    <input type="hidden" name="confirm_text" value="">
+    <input type="hidden" name="q" value="{{ filters.q }}">
+    <input type="hidden" name="status" value="{{ filters.status }}">
+    <input type="hidden" name="from" value="{{ filters.from }}">
+    <input type="hidden" name="to" value="{{ filters.to }}">
+    <input type="hidden" name="batch" value="{{ filters.batch }}">
+  </form>
+
+  <div class="bulkbar" data-bulkbar>
+    <span class="bulkbar__count"><span data-bulk-count>0</span> dipilih</span>
+    <div class="bulkbar__buttons">
+      {% if canWrite %}
+      <button class="btn btn--secondary btn--sm" type="submit" form="bulk-form" name="action" value="activate" data-bulk-action="activate" data-confirm data-confirm-label="Ya, aktifkan">{{ icon('check-circle', 16) }} Aktifkan</button>
+      <button class="btn btn--secondary btn--sm" type="submit" form="bulk-form" name="action" value="deactivate" data-bulk-action="deactivate" data-confirm data-confirm-label="Ya, nonaktifkan">{{ icon('prohibit', 16) }} Nonaktifkan</button>
+      {% endif %}
+      <button class="btn btn--secondary btn--sm" type="submit" form="bulk-form" name="action" value="export" data-bulk-action="export">{{ icon('download-simple', 16) }} Export</button>
+      {% if canWrite %}
+      <button class="btn btn--danger btn--sm" type="submit" form="bulk-form" name="action" value="delete" data-bulk-action="delete" data-confirm data-confirm-variant="danger" data-confirm-label="Ya, hapus permanen">{{ icon('trash', 16) }} Hapus</button>
+      {% endif %}
+      <button class="btn btn--ghost btn--sm" type="button" data-bulk-clear>Batal</button>
+    </div>
+    <div class="bulkbar__all" data-bulk-all hidden>
+      <span data-bulk-all-text></span>
+      <button type="button" data-bulk-all-button></button>
+    </div>
+  </div>
+
+  {% if rows | length %}
+  <div class="table-wrap">
+    <table class="table table--cards">
+      <thead>
+        <tr>
+          <th class="col-check" scope="col"><label class="check"><input type="checkbox" data-select-page aria-label="Pilih semua barcode di halaman ini"></label></th>
+          {{ sort_th('code', 'Kode', sort, dir, baseParams, '/admin/barcodes') }}
+          {{ sort_th('name', 'Nama', sort, dir, baseParams, '/admin/barcodes') }}
+          <th scope="col">Tujuan</th>
+          {{ sort_th('status', 'Status', sort, dir, baseParams, '/admin/barcodes') }}
+          {{ sort_th('scan_count', 'Total Scan', sort, dir, baseParams, '/admin/barcodes', 'desc', 'num') }}
+          {{ sort_th('created_at', 'Dibuat', sort, dir, baseParams, '/admin/barcodes', 'desc', 'c-date') }}
+          <th scope="col" class="num"><span class="sr-only">Aksi</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in rows %}
+        <tr>
+          <td class="col-check c-check"><label class="check"><input type="checkbox" name="ids" value="{{ b.id }}" form="bulk-form" data-row-check aria-label="Pilih {{ b.code }}"></label></td>
+          <td class="c-code"><a class="code-link" href="/admin/barcodes/{{ b.code }}">{{ b.code }}</a></td>
+          <td class="c-name">
+            <a class="cell-name" href="/admin/barcodes/{{ b.code }}" title="{{ b.name }}">{{ b.name }}</a>
+            {% if b.description %}<span class="cell-sub" title="{{ b.description }}">{{ b.description }}</span>{% endif %}
+          </td>
+          <td class="c-target">
+            {% if b.target_url %}
+            <a class="target-link" href="{{ b.target_url }}" target="_blank" rel="noopener noreferrer" title="{{ b.target_url }}">
+              {{ icon(typeIcons[b.target_type] or 'globe', 16) }}<span class="truncate">{{ b.target_url | displayUrl }}</span>
+            </a>
+            {% else %}
+            <span class="target-link target-link--empty">{{ icon('pencil-simple', 16) }}<span class="truncate">Belum diisi</span></span>
+            {% endif %}
+          </td>
+          <td class="c-status">{{ badge(b.state) }}</td>
+          <td class="num c-scans">{{ b.scan_count | num }}</td>
+          <td class="c-date muted nowrap">{{ b.created_at | date }}</td>
+          <td class="c-actions">
+            <div class="row-actions">
+              {% if canWrite %}<a class="btn btn--ghost btn--icon" href="/admin/barcodes/{{ b.code }}/edit" aria-label="Edit {{ b.code }}" title="Edit">{{ icon('pencil-simple', 18) }}</a>{% endif %}
+              <details class="menu">
+                <summary class="btn btn--ghost btn--icon" aria-label="Aksi lainnya untuk {{ b.code }}" title="Aksi lainnya">{{ icon('dots-three', 20) }}</summary>
+                <div class="menu__panel">
+                  <a class="menu__item" href="/admin/barcodes/{{ b.code }}">{{ icon('eye', 18) }} Lihat detail</a>
+                  <div class="menu__sep"></div>
+                  <a class="menu__item" href="/admin/barcodes/{{ b.code }}/qr.png?download=1">{{ icon('download-simple', 18) }} Download QR (PNG)</a>
+                  <a class="menu__item" href="/admin/barcodes/{{ b.code }}/qr.svg?download=1">{{ icon('download-simple', 18) }} Download QR (SVG)</a>
+                  <a class="menu__item" href="/admin/barcodes/{{ b.code }}/print" target="_blank" rel="noopener">{{ icon('printer', 18) }} Cetak QR</a>
+                  {% if canWrite %}
+                  <div class="menu__sep"></div>
+                  <form class="menu__form" method="post" action="/admin/barcodes/{{ b.code }}/status">
+                    {{ hidden_csrf() }}
+                    <input type="hidden" name="return_to" value="{{ returnTo }}">
+                    <input type="hidden" name="status" value="{{ 'inactive' if b.status == 'active' else 'active' }}">
+                    {% if b.status == 'active' %}
+                    <button class="menu__item" type="submit" data-confirm data-confirm-title="Nonaktifkan {{ b.code }}?" data-confirm-message="Pemindai akan melihat halaman &quot;Barcode Tidak Aktif&quot; sampai barcode diaktifkan kembali. QR Code tidak perlu dicetak ulang." data-confirm-label="Ya, nonaktifkan">{{ icon('power', 18) }} Nonaktifkan</button>
+                    {% else %}
+                    <button class="menu__item" type="submit">{{ icon('power', 18) }} Aktifkan</button>
+                    {% endif %}
+                  </form>
+                  <form class="menu__form" method="post" action="/admin/barcodes/{{ b.code }}/delete">
+                    {{ hidden_csrf() }}
+                    <input type="hidden" name="return_to" value="{{ returnTo }}">
+                    <button class="menu__item menu__item--danger" type="submit" data-confirm data-confirm-variant="danger" data-confirm-title="Hapus {{ b.code }}?" data-confirm-message="{{ b.name }} beserta statistik dan riwayatnya akan dihapus permanen. QR Code yang sudah tercetak akan menampilkan &quot;Barcode Tidak Ditemukan&quot;." data-confirm-label="Ya, hapus">{{ icon('trash', 18) }} Hapus</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </details>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ pager(pagination, baseParams, '/admin/barcodes', perPage, perPageOptions) }}
+  {% else %}
+  <div class="empty">
+    <span class="empty__icon">{{ icon('magnifying-glass' if hasFilters else 'qr-code', 24) }}</span>
+    <h2 class="empty__title">{{ 'Tidak ada barcode yang cocok' if hasFilters else 'Belum ada barcode' }}</h2>
+    <p class="empty__text">{{ 'Coba ubah kata kunci atau hapus sebagian filter.' if hasFilters else 'Buat barcode pertama atau impor banyak barcode dari file CSV.' }}</p>
+    {% if hasFilters %}<a class="btn btn--secondary" href="/admin/barcodes">Reset filter</a>
+    {% elif canWrite %}<a class="btn btn--primary" href="/admin/barcodes/new">{{ icon('plus', 18) }} Buat Barcode</a>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "layouts/public.njk" %}
+
+{# Shell of the public edit-link pages (the info page and the form page): brand, one narrow column, and the note
+   about the secret. Pages fill the "editContent" block. #}
+
+{% block content %}
+<div class="edit-page">
+  <div class="edit-page__box">
+    <div class="auth__brand">
+      <span class="pub-brand"><span class="pub-brand__mark">{{ icon('qr-code', 18) }}</span><span>{{ app.name }}</span></span>
+    </div>
+
+    {% block editContent %}{% endblock %}
+
+    <p class="edit-page__foot">{{ icon('lock-simple', 14) }}<span>Link ini bersifat rahasia: siapa pun yang memilikinya dapat mengubah tujuan barcode ini, jadi jangan bagikan ke orang yang tidak dipercaya. Hanya tujuan yang bisa diubah, dan setiap perubahan tercatat.</span></p>
+  </div>
+</div>
+{% endblock %}
