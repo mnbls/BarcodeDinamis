@@ -221,7 +221,7 @@
 .status-foot { margin-top: 20px; text-align: center; font-size: 12.5px; color: var(--faint); }
 .status-foot code { font-family: var(--font-mono); }
 
-/* ---- public edit link (/e/{token}): fill in or change the destination without an account ---------------- */
+/* ---- public edit link (/e/{token}): the activation page of a review card and its one-field form, no account ---- */
 .edit-page { position: relative; min-height: 100vh; display: grid; justify-items: center; align-content: start; padding: 40px 16px 56px; overflow: hidden; }
 .edit-page::before {
   content: '';
@@ -235,36 +235,88 @@
   mask-image: radial-gradient(ellipse 70% 50% at 50% 20%, #000 20%, transparent 75%);
   pointer-events: none;
 }
-.edit-page__box { position: relative; width: min(560px, 100%); animation: hero-in 0.7s var(--ease) both; }
+.edit-page__box { position: relative; width: min(460px, 100%); animation: hero-in 0.7s var(--ease) both; }
 .edit-page__title { margin-bottom: 10px; text-align: center; font-family: var(--font-serif); font-weight: 400; font-size: 40px; line-height: 1.05; letter-spacing: -0.03em; text-wrap: balance; }
-.edit-page__sub { max-width: 46ch; margin: 0 auto 26px; text-align: center; color: var(--muted); font-size: 14.5px; line-height: 1.6; }
-.edit-card { overflow: hidden; }
-.edit-card__id { display: flex; align-items: center; gap: 18px; padding: 20px 24px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
-.edit-card__qr { flex: none; width: 88px; height: 88px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-.edit-card__qr svg { display: block; width: 100%; height: 100%; }
-.edit-card__meta { display: grid; justify-items: start; gap: 6px; min-width: 0; }
-.edit-card__code { font-family: var(--font-mono); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
-.edit-card__name { font-size: 15px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
-.edit-card__body { display: grid; gap: 16px; padding: 24px; }
+.edit-page__sub { max-width: 46ch; margin: 0 auto 26px; text-align: center; color: var(--muted); font-size: 14.5px; line-height: 1.6; text-wrap: balance; }
+.edit-page__foot { display: flex; gap: 10px; margin-top: 20px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+.edit-page__foot .icon { flex: none; margin-top: 3px; }
+.pub-brand__mark--star { color: var(--yellow-bg); }
 
-/* form page: which barcode this is, and the way back to the info page */
+/* small label above the title: "AKTIVASI KARTU" between two hairlines */
+.rv-eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: min(340px, 100%);
+  margin: 0 auto 16px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.rv-eyebrow::before, .rv-eyebrow::after { content: ''; flex: 1 1 0; min-width: 0; height: 1px; background: var(--line-strong); }
+
+/* activation page (/e/{token}): the card, then where the person is in the three steps */
+.rv-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; } /* minmax(0, ...): the card's ratio must never widen the column */
+
+/* the card itself: credit-card proportions, flat near-black, the real QR on a white tile */
+.rv-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 14px;
+  aspect-ratio: 1.586;
+  padding: 22px 24px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: #f4f2ec;
+}
+.rv-card__top { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rv-card__brand { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+.rv-card__mark { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; background: var(--yellow-bg); color: var(--ink); }
+.rv-card__main { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.rv-card__pitch { display: grid; gap: 8px; min-width: 0; }
+.rv-card__stars { display: inline-flex; gap: 3px; color: var(--yellow-bg); }
+.rv-card__headline { margin: 0; font-family: var(--font-serif); font-size: 28px; line-height: 1.05; letter-spacing: -0.02em; text-wrap: balance; }
+.rv-card__hint { max-width: 24ch; margin: 0; font-size: 12.5px; line-height: 1.5; text-wrap: balance; color: rgba(244, 242, 236, 0.62); }
+.rv-card__qr { flex: none; width: 112px; height: 112px; padding: 3px; border-radius: 9px; background: #fff; }
+.rv-card__qr svg { display: block; width: 100%; height: 100%; }
+.rv-card__foot { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 14px; min-width: 0; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 13.5px; }
+.rv-card__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.rv-card__code { flex: none; font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.04em; color: rgba(244, 242, 236, 0.62); }
+
+/* the steps: done = filled ink, current = ringed, still to come = quiet */
+.rv-panel { padding: 24px; }
+.rv-panel__title { margin: 0 0 18px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.rv-steps { display: grid; margin: 0 0 24px; padding: 0; list-style: none; }
+.rv-step { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; padding-bottom: 22px; }
+.rv-step:last-child { padding-bottom: 0; }
+.rv-step::before { content: ''; position: absolute; left: 13px; top: 34px; bottom: 6px; width: 2px; background: var(--line); }
+.rv-step:last-child::before { display: none; }
+.rv-step.is-done::before { background: var(--ink); }
+.rv-step__mark { position: relative; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.rv-step.is-done .rv-step__mark { border-color: var(--ink); background: var(--ink); color: #fff; }
+.rv-step.is-current .rv-step__mark { border: 2px solid var(--ink); color: var(--ink); }
+.rv-step__title { display: block; font-size: 15px; font-weight: 600; line-height: 28px; letter-spacing: -0.01em; }
+.rv-step:not(.is-done):not(.is-current) .rv-step__title { color: var(--muted); }
+.rv-step__desc { margin: 2px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.rv-step__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* form page (/e/{token}/edit): which barcode this is, and the way back */
+.edit-card { overflow: hidden; }
+.edit-card__body { display: grid; gap: 16px; padding: 24px; }
 .edit-card__ref { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .edit-card__refmeta { display: grid; gap: 2px; min-width: 0; }
+.edit-card__code { font-family: var(--font-mono); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+.edit-card__name { font-size: 15px; font-weight: 500; line-height: 1.35; overflow-wrap: anywhere; }
 .edit-back { flex: none; display: inline-flex; align-items: center; gap: 6px; padding-top: 2px; font-size: 13.5px; color: var(--muted); }
 .edit-back:hover { color: var(--ink); }
 .edit-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 22px; }
-
-/* info page: where the barcode points now */
-.edit-now { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
-.edit-now__label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.edit-now__value { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; font-size: 14px; }
-.edit-now__type { padding: 2px 8px; border-radius: 6px; background: var(--surface-3); font-size: 12px; font-weight: 500; color: var(--ink-2); }
-.edit-now__text { min-width: 0; overflow-wrap: anywhere; }
-.edit-now__open { display: inline-grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); }
-.edit-now__open:hover { background: var(--surface-2); color: var(--ink); }
-.edit-now__empty { font-size: 14px; color: var(--muted); }
-.edit-page__foot { display: flex; gap: 10px; margin-top: 20px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
-.edit-page__foot .icon { flex: none; margin-top: 3px; }
 
 /* ---- responsive ------------------------------------------------------------------------------------------ */
 @media (max-width: 980px) {
@@ -294,9 +346,18 @@
   .status-card h1 { font-size: 32px; }
   .edit-page { padding-top: 28px; }
   .edit-page__title { font-size: 32px; }
-  .edit-card__id { gap: 14px; padding: 16px 18px; }
-  .edit-card__qr { width: 76px; height: 76px; }
   .edit-card__body { padding: 18px; }
   .edit-card__ref { padding: 14px 18px; }
+  .rv-card { gap: 10px; padding: 18px 18px 14px; }
+  .rv-card__headline { font-size: 23px; }
+  .rv-card__qr { width: 92px; height: 92px; }
+  .rv-panel { padding: 20px 18px; }
+  .rv-step__actions .btn { flex: 1 1 auto; }
   .faq details p { padding-right: 0; }
+}
+
+@media (max-width: 380px) {
+  .rv-eyebrow::before, .rv-eyebrow::after { display: none; }
+  .rv-card__hint { display: none; }
+  .rv-card__qr { width: 84px; height: 84px; }
 }

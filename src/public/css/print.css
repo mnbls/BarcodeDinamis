@@ -1,4 +1,4 @@
-/* QR label print view (admin/barcodes/print). The toolbar disappears when printing. */
+/* Print view (admin/barcodes/print): the plain QR label and the review card. The toolbar disappears when printing. */
 body { background: #f1f0ec; }
 
 .print-toolbar {
@@ -43,4 +43,116 @@ body { background: #f1f0ec; }
   .print-toolbar { display: none !important; }
   .sheet { padding: 0; place-items: start start; }
   .label { border: 1px solid #000; border-radius: 0; }
+}
+
+/* ---- which one shows: the "Bentuk" radios decide, no script ------------------------------------------------------
+   Without the card radio checked (or without a card at all) the label shows; with it checked, the card. */
+.print-page:not(:has(input[name='layout'][value='card']:checked)) :is(.pcards, [data-only='card']) { display: none; }
+.print-page:has(input[name='layout'][value='card']:checked) :is(.label, [data-only='label']) { display: none; }
+
+/* ---- review card ---------------------------------------------------------------------------------------------------
+   The printed twin of the card on the activation page (.rv-card in public.css): flat near-black, warm off-white type,
+   Instrument Serif headline, five stars, the real QR on a white tile. Every length inside is a multiple of --u (1% of the
+   card width), so one drawing serves the 8,56 cm card and the large one. On screen the card is a 420px preview; in print
+   --card-w becomes the real size. */
+.pcards {
+  --card-w: 420px;
+  --card-h: calc(var(--card-w) * 54 / 85.6); /* ID-1 proportions, as .rv-card */
+  --u: calc(var(--card-w) / 100);
+
+  /* dark (default) */
+  --pc-bg: var(--ink);
+  --pc-fg: #f4f2ec;
+  --pc-muted: rgba(244, 242, 236, 0.62);
+  --pc-rule: rgba(244, 242, 236, 0.16);
+  --pc-star: var(--yellow-bg);
+  --pc-chip-bg: var(--yellow-bg);
+  --pc-chip-fg: var(--ink);
+  --pc-edge: transparent;
+
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 32px;
+  page: pcard-standard;
+}
+/* light: saves ink and suits plain paper; the hairline edge doubles as a cutting guide */
+.print-page:has(input[name='card-theme'][value='light']:checked) .pcards {
+  --pc-bg: var(--surface-2);
+  --pc-fg: var(--ink);
+  --pc-muted: var(--muted);
+  --pc-rule: var(--line-strong);
+  --pc-star: var(--yellow-ink);
+  --pc-chip-bg: var(--ink);
+  --pc-chip-fg: var(--yellow-bg);
+  --pc-edge: var(--line-strong);
+}
+
+.pcard-wrap { display: grid; justify-items: start; gap: 10px; margin: 0; }
+.pcard-cap { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+.pcard {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: calc(var(--u) * 2.6);
+  width: var(--card-w);
+  height: var(--card-h);
+  padding: calc(var(--u) * 6) calc(var(--u) * 7) calc(var(--u) * 5);
+  overflow: hidden;
+  border: calc(var(--u) * 0.3) solid var(--pc-edge);
+  border-radius: calc(var(--u) * 3.7);
+  background: var(--pc-bg);
+  color: var(--pc-fg);
+  font-size: calc(var(--u) * 3.4);
+  line-height: 1.4;
+}
+/* browsers leave backgrounds out of a printout unless told otherwise; a dark card would come out as white type on white */
+.pcard, .pcard * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+.pcard__top { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 3); min-width: 0; }
+.pcard__brand { display: inline-flex; align-items: center; gap: calc(var(--u) * 2); min-width: 0; font-size: calc(var(--u) * 3.9); font-weight: 600; letter-spacing: -0.01em; }
+.pcard__brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard__mark { flex: none; display: grid; place-items: center; width: calc(var(--u) * 6.4); height: calc(var(--u) * 6.4); border-radius: calc(var(--u) * 1.7); background: var(--pc-chip-bg); color: var(--pc-chip-fg); }
+.pcard__mark .icon { width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); }
+.pcard__stars { display: inline-flex; flex: none; gap: calc(var(--u) * 0.9); color: var(--pc-star); }
+.pcard__stars .icon { width: calc(var(--u) * 3.8); height: calc(var(--u) * 3.8); }
+
+/* front */
+.pcard__main { display: flex; align-items: center; justify-content: space-between; gap: calc(var(--u) * 5); min-height: 0; }
+.pcard__pitch { display: grid; gap: calc(var(--u) * 2.4); min-width: 0; }
+.pcard__headline { margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: calc(var(--u) * 7.8); line-height: 1.02; letter-spacing: -0.02em; text-wrap: balance; }
+.pcard__hint { max-width: 26ch; margin: 0; font-size: calc(var(--u) * 3.2); line-height: 1.45; text-wrap: balance; color: var(--pc-muted); }
+/* the tile is the quiet zone's second layer: the QR svg already carries its own 4-module margin */
+.pcard__qr { flex: none; box-sizing: border-box; width: calc(var(--u) * 29); height: calc(var(--u) * 29); padding: calc(var(--u) * 1.2); border-radius: calc(var(--u) * 2.4); background: #fff; }
+.pcard__qr img { display: block; width: 100%; height: 100%; }
+
+.pcard__foot { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--u) * 3); min-width: 0; padding-top: calc(var(--u) * 2.8); border-top: calc(var(--u) * 0.25) solid var(--pc-rule); font-size: calc(var(--u) * 3.6); }
+.pcard__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.pcard__code { flex: none; font-family: var(--font-mono); font-size: calc(var(--u) * 3.2); letter-spacing: 0.04em; color: var(--pc-muted); }
+
+/* back */
+.pcard__how { display: grid; align-content: center; gap: calc(var(--u) * 3); min-height: 0; }
+.pcard__title { margin: 0; font-family: var(--font-serif); font-weight: 400; font-size: calc(var(--u) * 6.2); line-height: 1.05; letter-spacing: -0.02em; }
+.pcard__steps { display: grid; gap: calc(var(--u) * 2); margin: 0; padding: 0; list-style: none; }
+.pcard__step { display: flex; align-items: center; gap: calc(var(--u) * 3); font-size: calc(var(--u) * 3.5); line-height: 1.3; }
+.pcard__num { flex: none; display: grid; place-items: center; box-sizing: border-box; width: calc(var(--u) * 5); height: calc(var(--u) * 5); border: calc(var(--u) * 0.3) solid var(--pc-muted); border-radius: 50%; font-family: var(--font-mono); font-size: calc(var(--u) * 2.9); line-height: 1; }
+.pcard__foot--note { font-size: calc(var(--u) * 3); }
+.pcard__fallback { color: var(--pc-muted); }
+.pcard__fallback b { font-family: var(--font-mono); font-weight: 500; letter-spacing: 0; color: var(--pc-fg); overflow-wrap: anywhere; }
+
+/* Real size in print. A named page gives each size its own sheet: the card IS the page (no margin), so a PDF saved from the
+   print dialog can go to a printer as it is. Front and back become page 1 and page 2. */
+@page pcard-standard { size: 85.6mm 54mm; margin: 0; }
+@page pcard-large { size: 145.5mm 91.8mm; margin: 0; }
+.print-page:has(input[name='card-size'][value='large']:checked) .pcards { page: pcard-large; }
+
+@media print {
+  .print-page:has(input[name='layout'][value='card']:checked) .sheet { display: block; padding: 0; }
+  .pcards { --card-w: 85.6mm; --card-h: 54mm; display: block; }
+  .print-page:has(input[name='card-size'][value='large']:checked) .pcards { --card-w: 145.5mm; --card-h: 91.8mm; }
+  .pcard-wrap { display: block; break-inside: avoid; break-after: page; }
+  .pcard-wrap:last-child { break-after: auto; }
+  .pcard-cap { display: none; }
+  .pcard { border-radius: 0; } /* the printer cuts the corners; a rounded artwork would leave white slivers */
 }

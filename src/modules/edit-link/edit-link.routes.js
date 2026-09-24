@@ -1,18 +1,21 @@
 import express, { Router } from 'express';
+import { isUnguessableCode } from '../../lib/codes.js';
 import { editLinkLimiters } from '../../middleware/rate-limit.js';
-import { parseTarget } from '../barcodes/targets.js';
 import * as service from './edit-link.service.js';
 
 // ?saved=1|0 after a redirect. Only these two values can ever reach the template.
 const SAVED_NOTICE = new Map([['1', 'yes'], ['0', 'same']]);
 
 /**
- * Public edit link. Whoever holds the link can fill in or change the destination of that one barcode,
- * without an account. Two pages:
+ * Public edit link. Whoever holds the link can enter the Google Maps link of their place, without an account:
+ * the barcode then leads to the Google review page of that place. Two pages:
  *
- *   GET  /e/{token}        info page: QR, code, name, status, current destination, and a button to the form
- *   GET  /e/{token}/edit   form page: the destination fields only
+ *   GET  /e/{token}        info page: QR, code, name, status, whether Maps is set, and a button to the form
+ *   GET  /e/{token}/edit   form page: one empty field for the Google Maps link
  *   POST /e/{token}/edit   saves, then redirects to the info page (?saved=1|0); errors re-show the form (422)
+ *
+ * The form is always empty when it opens (even if a Maps link is already saved): what is stored is not the link that
+ * gets pasted (the barcode keeps the Place ID and the review address), so showing it there would only confuse.
  *
  * The secret is the first path segment after /e/, so every page (and its logs, see lib/redact.js) is covered.
  *
@@ -43,26 +46,28 @@ export function createEditLinkRouter(ctx) {
       message: 'Link ini tidak dikenali atau sudah dicabut. Minta link edit yang baru kepada pengelola barcode.',
     });
 
-  // Page 1, the info page: what the barcode is and where it points now. Read-only; a button leads to the form.
+  // Page 1, the info page, dressed as the card's activation page: what the barcode is and whether Google Maps is set.
+  // Read-only; a button leads to the form.
   async function showInfo(res, token, barcode, { saved = '' } = {}) {
     res.render('pages/edit-link', {
-      title: 'Info barcode',
+      title: 'Aktivasi kartu',
       token,
       barcode,
-      current: parseTarget(barcode.target_type, barcode.target_url),
       qrSvg: await ctx.qr.svg(barcode.code),
       saved,
+      // Scanning this card while it waits for its Maps link brings the scanner right here (see redirect.routes.js).
+      opensActivation: isUnguessableCode(barcode.code),
     });
   }
 
-  // Page 2, the form: only the fields for the destination. Also the page that shows validation errors.
-  function showForm(res, token, barcode, { form, errors = {}, status = 200 } = {}) {
-    const current = parseTarget(barcode.target_type, barcode.target_url);
+  // Page 2, the form: a single field for the Google Maps link. Also the page that shows validation errors, where the
+  // link that was just typed is kept so it can be corrected instead of pasted again.
+  function showForm(res, token, barcode, { typed = '', errors = {}, status = 200 } = {}) {
     res.status(status).render('pages/edit-link-form', {
-      title: barcode.target_url ? 'Ubah tujuan barcode' : 'Isi tujuan barcode',
+      title: 'Masukkan Maps',
       token,
       barcode,
-      form: form ?? { target_type: barcode.target_type, target_value: current.value, target_extra: current.extra },
+      form: { maps_link: typed },
       errors,
     });
   }
@@ -86,12 +91,12 @@ export function createEditLinkRouter(ctx) {
     const { token } = req.params;
     let result;
     try {
-      result = await service.saveTargetViaLink(ctx, token, req.body, { ip: req.ip });
+      result = await service.saveMapsViaLink(ctx, token, req.body, { ip: req.ip });
     } catch (err) {
       if (err.status === 404) return deadLink(res);
       throw err;
     }
-    if (!result.ok) return showForm(res, token, result.barcode, { form: req.body, errors: result.errors, status: 422 });
+    if (!result.ok) return showForm(res, token, result.barcode, { typed: String(req.body.maps_link ?? '').slice(0, 2100), errors: result.errors, status: 422 });
     return res.redirect(303, `/e/${token}?saved=${result.changed ? 1 : 0}`); // back to the info page, which confirms it
   });
 

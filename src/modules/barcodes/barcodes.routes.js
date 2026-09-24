@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { normalizeCode } from '../../lib/codes.js';
+import { isUnguessableCode, normalizeCode } from '../../lib/codes.js';
 import { cleanLine } from '../../lib/text.js';
 import { buildPagination, PER_PAGE_OPTIONS, parsePage, parsePerPage } from '../../lib/pagination.js';
 import { notFound } from '../../lib/http-errors.js';
@@ -115,7 +115,7 @@ export function createBarcodesRouter(ctx) {
     req.flash(
       'success',
       pending
-        ? 'Barcode dibuat, tujuannya belum diisi. Bagikan link edit di bawah agar orang lain bisa mengisinya tanpa login.'
+        ? 'Barcode dibuat dan langsung siap dicetak. Saat dipindai, pemindai dibawa ke halaman aktivasi untuk memasukkan link Google Maps. Link edit-nya ada di bawah.'
         : 'Barcode berhasil dibuat. QR Code siap diunduh atau dicetak.',
     );
     return res.redirect(`/admin/barcodes/${result.barcode.code}${pending ? '#link-edit' : ''}`);
@@ -156,12 +156,13 @@ export function createBarcodesRouter(ctx) {
     const barcode = await service.getBarcodeOrThrow(ctx, req.code);
     const range = resolveRange(req.query, config.timezone, '30');
 
-    const [summary, report, recent, history, editLink] = await Promise.all([
+    const [summary, report, recent, history, editLink, hasEditLink] = await Promise.all([
       analytics.summary(db, config.timezone, barcode.id),
       loadRangeReport(db, range, { barcodeId: barcode.id }),
       analytics.recentScans(db, barcode.id, 10),
       repo.historyForBarcode(db, barcode.id, 20),
       service.editLinkFor(ctx, barcode, req.user), // null for viewers: the link is a write capability
+      repo.hasEditToken(db, barcode.id), // a yes/no for everybody: the secret itself stays with the admins
     ]);
 
     res.render('admin/barcodes/show', {
@@ -169,6 +170,8 @@ export function createBarcodesRouter(ctx) {
       nav: 'barcodes',
       barcode,
       editLink,
+      // Scanning a barcode that waits for its destination opens its activation page (see redirect.routes.js).
+      opensActivation: barcode.state === 'pending' && hasEditLink && isUnguessableCode(barcode.code),
       redirectUrl: qr.redirectUrl(barcode.code),
       summary,
       report,
@@ -262,6 +265,8 @@ export function createBarcodesRouter(ctx) {
       barcode,
       redirectUrl: qr.redirectUrl(barcode.code),
       auto: req.query.auto === '1',
+      // ?layout=card opens the review card instead of the plain label; the template ignores it for barcodes without a card.
+      layout: req.query.layout === 'card' ? 'card' : 'label',
     });
   });
 

@@ -145,6 +145,17 @@
     });
   }
 
+  /* ---- forms that must not be sent twice: the Maps form asks Google, which can take a few seconds ------------ */
+  $$('form[data-single-submit]').forEach((form) => {
+    form.addEventListener('submit', () => {
+      const submit = $('[type="submit"]', form);
+      if (!submit) return;
+      submit.disabled = true;
+      submit.setAttribute('aria-busy', 'true');
+      if (submit.dataset.busyText) submit.textContent = submit.dataset.busyText;
+    });
+  });
+
   /* ---- print: label size ------------------------------------------------------------------------------------- */
   const label = $('[data-label]');
   if (label) {

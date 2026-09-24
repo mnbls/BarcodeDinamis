@@ -1,12 +1,16 @@
 // Generates src/lib/icons.generated.js from the Phosphor "bold" set (MIT, @phosphor-icons/core).
 // Only the icons listed below are extracted, so the app has no runtime dependency on the package.
+// A name ending in "-fill" (e.g. "star-fill") comes from the solid "fill" set instead.
 //   npm run icons:build
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const SOURCE_DIR = path.join(ROOT, 'node_modules', '@phosphor-icons', 'core', 'assets', 'bold');
+const ASSETS_DIR = path.join(ROOT, 'node_modules', '@phosphor-icons', 'core', 'assets');
 const OUTPUT = path.join(ROOT, 'src', 'lib', 'icons.generated.js');
+
+/** "star-fill" -> assets/fill/star-fill.svg, everything else -> assets/bold/<name>-bold.svg */
+const sourceFile = (name) => (name.endsWith('-fill') ? path.join(ASSETS_DIR, 'fill', `${name}.svg`) : path.join(ASSETS_DIR, 'bold', `${name}-bold.svg`));
 
 const ICONS = [
   'squares-four', 'qr-code', 'plus', 'plus-circle', 'upload-simple', 'download-simple', 'chart-line-up',
@@ -18,13 +22,14 @@ const ICONS = [
   'calendar-blank', 'arrow-counter-clockwise', 'x-circle', 'prohibit', 'hourglass', 'lock-simple',
   'database', 'cursor-click', 'table', 'arrows-down-up', 'file-arrow-down', 'plus-minus', 'browser',
   'robot', 'identification-card', 'minus', 'question', 'trend-up', 'trend-down', 'circle-notch',
+  'map-pin', 'star', 'star-fill',
 ];
 
 const out = {};
 const missing = [];
 for (const name of ICONS) {
   try {
-    const svg = await readFile(path.join(SOURCE_DIR, `${name}-bold.svg`), 'utf8');
+    const svg = await readFile(sourceFile(name), 'utf8');
     const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').trim();
     if (!inner) throw new Error('empty');
     out[name] = inner;

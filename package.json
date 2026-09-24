@@ -20,8 +20,9 @@
     "admin:reset": "node scripts/reset-password.js",
     "smoke": "node scripts/smoke.js",
     "data:generate": "node scripts/generate-data.js",
+    "maps:rebuild": "node scripts/rebuild-review-urls.js",
     "icons:build": "node scripts/build-icons.js",
-    "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
+    "test": "node scripts/run-tests.js"
   },
   "license": "UNLICENSED",
   "dependencies": {

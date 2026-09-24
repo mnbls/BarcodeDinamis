@@ -1,6 +1,7 @@
 {# Reusable UI pieces. Import with:  {% from "macros/ui.njk" import badge, pagination with context %} #}
 
-{% macro badge(state) -%}
+{# `pendingLabel`: the word for a barcode that has no destination yet ("Belum diisi" for admins, "Belum aktif" on a card's activation page). #}
+{% macro badge(state, pendingLabel = 'Belum diisi') -%}
   {%- if state == 'active' -%}
     <span class="badge badge--green">{{ icon('check-circle', 13) }}Aktif</span>
   {%- elif state == 'inactive' -%}
@@ -8,7 +9,7 @@
   {%- elif state == 'expired' -%}
     <span class="badge badge--yellow">{{ icon('hourglass', 13) }}Kedaluwarsa</span>
   {%- elif state == 'pending' -%}
-    <span class="badge badge--blue">{{ icon('pencil-simple', 13) }}Belum diisi</span>
+    <span class="badge badge--blue">{{ icon('pencil-simple', 13) }}{{ pendingLabel }}</span>
   {%- else -%}
     <span class="badge">{{ state }}</span>
   {%- endif -%}

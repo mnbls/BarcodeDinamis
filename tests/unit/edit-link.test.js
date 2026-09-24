@@ -50,7 +50,7 @@ describe('redactUrl (what may appear in logs)', () => {
 
 describe('validateTarget', () => {
   it('validates type + value the same way for every caller', () => {
-    assert.deepEqual(validateTarget({ target_type: 'url', target_value: 'https://contoh.com/x' }, ctx), { targetType: 'url', targetUrl: 'https://contoh.com/x', errors: {} });
+    assert.deepEqual(validateTarget({ target_type: 'url', target_value: 'https://contoh.com/x' }, ctx), { targetType: 'url', targetUrl: 'https://contoh.com/x', mapsInput: null, errors: {} });
     assert.equal(validateTarget({ target_type: 'phone', target_value: '0274123456' }, ctx).targetUrl, 'tel:+62274123456');
     assert.match(validateTarget({ target_type: 'url', target_value: 'javascript:alert(1)' }, ctx).errors.target_value, /http/);
     assert.match(validateTarget({ target_type: 'sms', target_value: '1' }, ctx).errors.target_type, /tidak dikenal/);
@@ -59,7 +59,7 @@ describe('validateTarget', () => {
 
   it('accepts a blank destination only when asked to, and never a half-filled one', () => {
     const blank = { target_type: 'url', target_value: '   ', target_extra: '' };
-    assert.deepEqual(validateTarget(blank, ctx, { allowEmpty: true }), { targetType: 'url', targetUrl: null, errors: {} });
+    assert.deepEqual(validateTarget(blank, ctx, { allowEmpty: true }), { targetType: 'url', targetUrl: null, mapsInput: null, errors: {} });
     assert.match(validateTarget(blank, ctx).errors.target_value, /wajib diisi/, 'required by default');
     assert.deepEqual(validateTarget({ target_type: 'whatsapp' }, ctx, { allowEmpty: true }).targetUrl, null, 'missing fields count as blank');
 
@@ -71,6 +71,21 @@ describe('validateTarget', () => {
 
   it('keeps the chosen type on a blank destination, so the form can reopen on it', () => {
     assert.equal(validateTarget({ target_type: 'whatsapp', target_value: '' }, ctx, { allowEmpty: true }).targetType, 'whatsapp');
+  });
+
+  it('a Google Maps destination is only CHECKED here (host, shape); turning it into a Place ID is the service\'s job', () => {
+    const ok = validateTarget({ target_type: 'maps_review', target_value: '  maps.app.goo.gl/AZQV8dReQ9ZFcqjv6  ' }, ctx);
+    assert.deepEqual(ok, { targetType: 'maps_review', targetUrl: null, mapsInput: 'https://maps.app.goo.gl/AZQV8dReQ9ZFcqjv6', errors: {} });
+
+    assert.match(validateTarget({ target_type: 'maps_review', target_value: 'https://example.com/maps' }, ctx).errors.target_value, /dari Google Maps/);
+    assert.match(validateTarget({ target_type: 'maps_review', target_value: '' }, ctx).errors.target_value, /wajib diisi/, 'required unless the barcode may stay empty');
+    assert.deepEqual(validateTarget({ target_type: 'maps_review', target_value: '   ' }, ctx, { allowEmpty: true }), { targetType: 'maps_review', targetUrl: null, mapsInput: null, errors: {} });
+    assert.ok(validateTarget({ target_type: 'maps_review', target_value: 'javascript:alert(1)' }, ctx, { allowEmpty: true }).errors.target_value, 'a filled value is still checked');
+  });
+
+  it('the CSV import cannot create Maps destinations (it only allows plain URLs)', () => {
+    const res = validateTarget({ target_type: 'maps_review', target_value: 'https://maps.app.goo.gl/abc' }, ctx, { allowedTypes: ['url'] });
+    assert.deepEqual(Object.keys(res.errors), ['target_type']);
   });
 });
 

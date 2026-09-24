@@ -1,54 +1,111 @@
 {% extends "layouts/edit-link.njk" %}
 {% from "macros/ui.njk" import badge with context %}
 
-{# INFO page of a public edit link: what this barcode is and where it points now. Read-only, no form.
-   The form lives on its own page (/e/{token}/edit), reached with the button below. #}
+{# ACTIVATION page of a public edit link, dressed as the activation page of a Google Maps review card. Read-only, no form:
+   the card (brand, QR, name, code, status), the three activation steps and where the person is in them.
+   The form lives on its own page (/e/{token}/edit), reached with the button at the bottom. No address is printed here:
+   what the barcode stores (a Place ID and a review address) is not what the person pastes.
+   Presentation only. The wording follows the barcode's own state; nothing is decided or computed anywhere else. #}
 
 {% block editContent %}
+{% set hasMaps = barcode.target_type == 'maps_review' and barcode.maps_place_id %}
 {% set filled = barcode.target_url %}
+{% set live = hasMaps and barcode.state == 'active' %}
 
-<h1 class="edit-page__title">Info barcode</h1>
-<p class="edit-page__sub">Anda memegang link edit untuk barcode ini. Dari sini Anda bisa mengisi atau mengubah tujuannya.</p>
+<p class="rv-eyebrow">Aktivasi kartu</p>
+{% if live %}
+<h1 class="edit-page__title">Kartu review Anda sudah aktif</h1>
+<p class="edit-page__sub">Setiap pemindaian kartu ini langsung diarahkan ke halaman ulasan Google untuk lokasi Anda. Lokasinya bisa diganti kapan saja, tanpa mencetak ulang kartu.</p>
+{% elif hasMaps %}
+<h1 class="edit-page__title">Maps sudah terhubung</h1>
+<p class="edit-page__sub">Lokasi Google Maps sudah tersimpan, tetapi pemindai belum bisa membuka halaman ulasannya. Keterangannya ada di bawah.</p>
+{% else %}
+<h1 class="edit-page__title">Aktifkan kartu review Anda</h1>
+<p class="edit-page__sub">Masukkan link Google Maps lokasi Anda. QR Code ini lalu mengarahkan pemindai ke halaman ulasan Google untuk lokasi itu.</p>
+{% endif %}
 
-<div class="card edit-card">
-  <div class="edit-card__id">
-    <div class="edit-card__qr" aria-hidden="true">{{ qrSvg | safe }}</div>
-    <div class="edit-card__meta">
-      <span class="edit-card__code">{{ barcode.code }}</span>
-      <span class="edit-card__name">{{ barcode.name }}</span>
-      {{ badge(barcode.state) }}
+<div class="rv-stack">
+  <div class="rv-card">
+    <div class="rv-card__top">
+      <span class="rv-card__brand"><span class="rv-card__mark">{{ icon('star-fill', 12) }}</span>{{ app.brand }}</span>
+      {{ badge(barcode.state, 'Belum aktif') }}
     </div>
-  </div>
-
-  <div class="edit-card__body">
-    {% if saved == 'yes' %}
-    <div class="alert alert--success" role="status">{{ icon('check-circle', 20) }}<div><strong>Tujuan tersimpan.</strong> QR Code langsung mengarah ke tujuan yang baru.</div></div>
-    {% elif saved == 'same' %}
-    <div class="alert alert--info" role="status">{{ icon('info', 20) }}<div>Tidak ada yang berubah: tujuan sama dengan yang sudah tersimpan.</div></div>
-    {% endif %}
-
-    {% if barcode.state == 'inactive' %}
-    <div class="alert alert--warn">{{ icon('prohibit', 20) }}<div>Barcode ini sedang dinonaktifkan oleh pengelolanya. Tujuan tetap bisa disimpan, tetapi pemindai baru bisa membukanya setelah pengelola mengaktifkan barcode.</div></div>
-    {% elif barcode.state == 'expired' %}
-    <div class="alert alert--warn">{{ icon('hourglass', 20) }}<div>Masa berlaku barcode ini sudah berakhir. Tujuan tetap bisa disimpan, tetapi pemindai baru melihat halaman "Barcode Sudah Tidak Berlaku" sampai pengelola memperpanjangnya.</div></div>
-    {% elif barcode.state == 'pending' %}
-    <div class="alert alert--info">{{ icon('pencil-simple', 20) }}<div>Tujuan barcode ini belum diisi. Sampai tujuan disimpan, pemindai melihat halaman "Barcode Belum Diisi".</div></div>
-    {% endif %}
-
-    <div class="edit-now">
-      <span class="edit-now__label">Tujuan saat ini</span>
-      {% if filled %}
-      <div class="edit-now__value">
-        <span class="edit-now__type">{{ barcode.target_type | typeLabel }}</span>
-        <span class="edit-now__text{% if barcode.target_type != 'url' %} mono{% endif %}" title="{{ barcode.target_url }}">{{ (barcode.target_url | displayUrl) if barcode.target_type == 'url' else current.value }}</span>
-        {% if barcode.target_url.startsWith('http') %}<a class="edit-now__open" href="{{ barcode.target_url }}" target="_blank" rel="noopener noreferrer" aria-label="Buka tujuan di tab baru" title="Buka tujuan">{{ icon('arrow-up-right', 16) }}</a>{% endif %}
+    <div class="rv-card__main">
+      <div class="rv-card__pitch">
+        <span class="rv-card__stars" aria-hidden="true">{% for n in range(0, 5) %}{{ icon('star-fill', 16) }}{% endfor %}</span>
+        <p class="rv-card__headline">Bagikan pengalaman Anda</p>
+        <p class="rv-card__hint">Pindai untuk menulis ulasan di Google</p>
       </div>
-      {% else %}
-      <span class="edit-now__empty">Belum diisi</span>
-      {% endif %}
+      <div class="rv-card__qr" aria-hidden="true">{{ qrSvg | safe }}</div>
     </div>
-
-    <a class="btn btn--primary btn--lg btn--block" href="/e/{{ token }}/edit">{{ icon('pencil-simple', 18) }} {{ 'Ubah tujuan' if filled else 'Isi tujuan' }}</a>
+    <div class="rv-card__foot">
+      <span class="rv-card__name" title="{{ barcode.name }}">{{ barcode.name }}</span>
+      <span class="rv-card__code">{{ barcode.code }}</span>
+    </div>
   </div>
+
+  {% if saved == 'yes' %}
+  <div class="alert alert--success" role="status">{{ icon('check-circle', 20) }}<div><strong>Maps tersimpan.</strong> QR Code sekarang mengarah ke halaman ulasan Google untuk lokasi ini. Simpan alamat halaman ini bila Anda ingin mengganti lokasinya nanti: setelah aktif, memindai kartu membuka halaman ulasan, bukan halaman ini.</div></div>
+  {% elif saved == 'same' %}
+  <div class="alert alert--info" role="status">{{ icon('info', 20) }}<div>Tidak ada yang berubah: Google Maps ini sudah tersimpan.</div></div>
+  {% endif %}
+
+  {% if barcode.state == 'inactive' %}
+  <div class="alert alert--warn">{{ icon('prohibit', 20) }}<div>Kartu ini sedang dinonaktifkan oleh pengelolanya. Maps tetap bisa dimasukkan, tetapi pemindai baru bisa membukanya setelah pengelola mengaktifkan kartu.</div></div>
+  {% elif barcode.state == 'expired' %}
+  <div class="alert alert--warn">{{ icon('hourglass', 20) }}<div>Masa berlaku kartu ini sudah berakhir. Maps tetap bisa dimasukkan, tetapi pemindai baru melihat halaman "Barcode Sudah Tidak Berlaku" sampai pengelola memperpanjangnya.</div></div>
+  {% endif %}
+
+  <section class="card rv-panel" aria-labelledby="rv-steps-title">
+    <h2 class="rv-panel__title" id="rv-steps-title">Langkah aktivasi</h2>
+    <ol class="rv-steps">
+      <li class="rv-step is-done">
+        <span class="rv-step__mark" aria-hidden="true">{{ icon('check', 14) }}</span>
+        <div class="rv-step__body">
+          <strong class="rv-step__title">Kartu terdaftar</strong>
+          <p class="rv-step__desc">Kartu ini sudah terdaftar di sistem.</p>
+        </div>
+      </li>
+      <li class="rv-step {{ 'is-done' if hasMaps else 'is-current' }}"{% if not hasMaps %} aria-current="step"{% endif %}>
+        <span class="rv-step__mark" aria-hidden="true">{% if hasMaps %}{{ icon('check', 14) }}{% else %}2{% endif %}</span>
+        <div class="rv-step__body">
+          {% if hasMaps %}
+          <strong class="rv-step__title">Maps terhubung</strong>
+          <p class="rv-step__desc">Halaman ulasan Google sudah disiapkan untuk lokasi ini.</p>
+          <div class="rv-step__actions">
+            {% if barcode.maps_source_url %}<a class="btn btn--secondary btn--sm" href="{{ barcode.maps_source_url }}" target="_blank" rel="noopener noreferrer">{{ icon('map-pin', 16) }} Cek lokasi</a>{% endif %}
+            <a class="btn btn--secondary btn--sm" href="{{ barcode.target_url }}" target="_blank" rel="noopener noreferrer">{{ icon('star', 16) }} Lihat halaman ulasan</a>
+          </div>
+          {% else %}
+          <strong class="rv-step__title">Masukkan Maps</strong>
+          <p class="rv-step__desc">{% if filled %}Kartu ini mengarah ke tujuan lain yang diatur pengelola. Memasukkan Maps akan menggantinya.{% else %}Tempel link lokasi bisnis Anda dari Google Maps.{% endif %}</p>
+          {% endif %}
+        </div>
+      </li>
+      <li class="rv-step{% if live %} is-done{% endif %}">
+        <span class="rv-step__mark" aria-hidden="true">{% if live %}{{ icon('check', 14) }}{% else %}3{% endif %}</span>
+        <div class="rv-step__body">
+          <strong class="rv-step__title">Kartu siap dipindai</strong>
+          {% if live %}
+          <p class="rv-step__desc">Pemindai langsung diarahkan ke halaman ulasan Google.</p>
+          {% elif barcode.state == 'pending' and opensActivation %}
+          <p class="rv-step__desc">Setelah Maps dimasukkan, pemindai langsung diarahkan ke halaman ulasan Google. Sebelum itu, memindai kartu ini membuka halaman ini.</p>
+          {% elif barcode.state == 'pending' %}
+          <p class="rv-step__desc">Sampai Maps dimasukkan, pemindai melihat halaman "Barcode Belum Diisi".</p>
+          {% elif hasMaps %}
+          <p class="rv-step__desc">Setelah kartu aktif kembali, pemindai langsung diarahkan ke halaman ulasan Google.</p>
+          {% else %}
+          <p class="rv-step__desc">Setelah Maps dimasukkan, pemindai langsung diarahkan ke halaman ulasan Google.</p>
+          {% endif %}
+        </div>
+      </li>
+    </ol>
+
+    {% if hasMaps %}
+    <a class="btn btn--secondary btn--lg btn--block" href="/e/{{ token }}/edit">{{ icon('map-pin', 18) }} Ganti lokasi Maps</a>
+    {% else %}
+    <a class="btn btn--primary btn--lg btn--block" href="/e/{{ token }}/edit">Aktifkan kartu {{ icon('arrow-right', 18) }}</a>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}

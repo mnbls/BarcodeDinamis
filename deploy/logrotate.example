@@ -1,0 +1,13 @@
+# Log rotation for the application log (storage/logs/app.log, written when LOG_TO_FILE=true, the production default).
+# Save as /etc/logrotate.d/dynamic-barcode and adjust the path to where the app lives.
+# (Nginx rotates its own logs; PM2 keeps its own too: `pm2 install pm2-logrotate`.)
+/srv/dynamic-barcode/storage/logs/*.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    # The app keeps the file open while it runs, so copy the content and truncate the original in place.
+    copytruncate
+}

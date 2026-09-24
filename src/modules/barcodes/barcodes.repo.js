@@ -13,8 +13,8 @@ export const STATE_SQL = `(CASE
 // "Valid" = switched on and not past its expiry. Both the active and the pending filters build on it.
 const VALID_SQL = `(b.status = 'active' AND (b.expired_at IS NULL OR b.expired_at > now()))`;
 
-const COLUMNS = `b.id, b.code, b.name, b.description, b.target_type, b.target_url, b.status,
-  b.expired_at, b.scan_count, b.last_scanned_at, b.import_batch_id, b.created_by,
+const COLUMNS = `b.id, b.code, b.name, b.description, b.target_type, b.target_url, b.maps_place_id, b.maps_source_url,
+  b.status, b.expired_at, b.scan_count, b.last_scanned_at, b.import_batch_id, b.created_by,
   b.created_at, b.updated_at, ${STATE_SQL} AS state`;
 
 /** Whitelist: user-supplied sort keys never reach the SQL text directly. */
@@ -94,11 +94,12 @@ export function resolveForRedirect(db, code) {
 }
 
 const INSERT_SQL = `
-  INSERT INTO barcodes (code, name, description, target_type, target_url, status, expired_at, created_by, import_batch_id, edit_token)
+  INSERT INTO barcodes (code, name, description, target_type, target_url, status, expired_at, created_by, import_batch_id,
+                        edit_token, maps_place_id, maps_source_url)
   SELECT t.code, t.name, t.description, t.target_type, t.target_url, t.status,
-         (t.expired_local::timestamp AT TIME ZONE $8), $9::bigint, $10::bigint, t.edit_token
-  FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $11::text[])
-       AS t(code, name, description, target_type, target_url, status, expired_local, edit_token)
+         (t.expired_local::timestamp AT TIME ZONE $8), $9::bigint, $10::bigint, t.edit_token, t.maps_place_id, t.maps_source_url
+  FROM unnest($1::text[], $2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $11::text[], $12::text[], $13::text[])
+       AS t(code, name, description, target_type, target_url, status, expired_local, edit_token, maps_place_id, maps_source_url)
   ON CONFLICT (code) DO NOTHING
   RETURNING id, code`;
 
@@ -106,15 +107,17 @@ const INSERT_SQL = `
  * Inserts many barcodes with one statement (arrays + unnest, so parameter count does not grow with
  * the number of rows). Codes are allocated here. A code collision (only possible in random mode, or
  * if someone inserted a code by hand) is retried with fresh codes. Every new barcode also gets its own
- * edit-link secret; a row whose targetUrl is null is a barcode that is filled in later.
+ * edit-link secret; a row whose targetUrl is null is a barcode that is filled in later. A "maps_review" row
+ * carries its Place ID (mapsPlaceId) and the Maps link it came from (mapsSourceUrl). `codeMode` ('random' or
+ * 'sequential') overrides CODE_MODE for the whole batch.
  * @returns {Promise<{id:number, code:string}[]>}
  */
-export async function insertRows(db, config, rows, { createdBy = null, importBatchId = null } = {}) {
+export async function insertRows(db, config, rows, { createdBy = null, importBatchId = null, codeMode } = {}) {
   let pending = rows;
   const inserted = [];
 
   for (let attempt = 0; attempt < 6 && pending.length > 0; attempt += 1) {
-    const codes = await allocateCodes(db, config, pending.length);
+    const codes = await allocateCodes(db, config, pending.length, { mode: codeMode });
     const res = await db.rows(INSERT_SQL, [
       codes,
       pending.map((r) => r.name),
@@ -127,6 +130,8 @@ export async function insertRows(db, config, rows, { createdBy = null, importBat
       createdBy,
       importBatchId,
       pending.map(() => generateEditToken()),
+      pending.map((r) => r.mapsPlaceId ?? null),
+      pending.map((r) => r.mapsSourceUrl ?? null),
     ]);
     inserted.push(...res);
     const done = new Set(res.map((r) => r.code));
@@ -141,10 +146,11 @@ export function update(db, id, values, { keepExpiry, timezone }) {
     `UPDATE barcodes b SET
        name = $2, description = $3, target_type = $4, target_url = $5, status = $6,
        expired_at = CASE WHEN $7::boolean THEN b.expired_at ELSE ($8::text)::timestamp AT TIME ZONE $9 END,
+       maps_place_id = $10, maps_source_url = $11,
        updated_at = now()
      WHERE b.id = $1
      RETURNING ${COLUMNS}`,
-    [id, values.name, values.description, values.targetType, values.targetUrl, values.status, keepExpiry, values.expiredLocal, timezone],
+    [id, values.name, values.description, values.targetType, values.targetUrl, values.status, keepExpiry, values.expiredLocal, timezone, values.mapsPlaceId ?? null, values.mapsSourceUrl ?? null],
   );
 }
 
@@ -155,10 +161,19 @@ export function findByEditToken(db, token, { forUpdate = false } = {}) {
   return db.one(`SELECT ${COLUMNS} FROM barcodes b WHERE b.edit_token = $1 ${forUpdate ? 'FOR UPDATE OF b' : ''}`, [token]);
 }
 
-/** The secret is kept out of COLUMNS on purpose: only code that really needs it (the admin's detail page) asks. */
+/**
+ * The secret is kept out of COLUMNS on purpose: only code that really needs it (the admin's detail page, and the scan of a
+ * card that has not been activated yet) asks.
+ */
 export async function getEditToken(db, id) {
   const row = await db.one('SELECT edit_token FROM barcodes WHERE id = $1', [id]);
   return row?.edit_token ?? null;
+}
+
+/** Whether the barcode has an edit link at all, without reading the secret (for pages that only describe what a scan does). */
+export async function hasEditToken(db, id) {
+  const row = await db.one('SELECT (edit_token IS NOT NULL) AS present FROM barcodes WHERE id = $1', [id]);
+  return Boolean(row?.present);
 }
 
 /** Stores a new secret (replacing the old link) or null (revoking the link). Not a content change: updated_at stays. */
@@ -167,9 +182,12 @@ export async function setEditToken(db, code, token) {
   return res.rowCount;
 }
 
-/** The only thing a holder of the edit link may change. */
-export function updateTarget(db, id, { targetType, targetUrl }) {
-  return db.query('UPDATE barcodes SET target_type = $2, target_url = $3, updated_at = now() WHERE id = $1', [id, targetType, targetUrl]);
+/** The only thing a holder of the edit link may change: the destination (and the Maps data that goes with it). */
+export function updateTarget(db, id, { targetType, targetUrl, mapsPlaceId = null, mapsSourceUrl = null }) {
+  return db.query(
+    'UPDATE barcodes SET target_type = $2, target_url = $3, maps_place_id = $4, maps_source_url = $5, updated_at = now() WHERE id = $1',
+    [id, targetType, targetUrl, mapsPlaceId, mapsSourceUrl],
+  );
 }
 
 export async function setStatus(db, code, status) {

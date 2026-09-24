@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
-import { PASSWORD, extractCsrf, loginAgent, makeUser, startApp, testConfig } from '../helpers/app.js';
+import { PASSWORD, extractCsrf, insertBarcodes, loginAgent, makeUser, mapsPlace, startApp, testConfig } from '../helpers/app.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 
@@ -177,5 +177,34 @@ describe('command line tools', () => {
     res = await run('generate-data.js', ['--barcodes', '20', '--reset', '--yes']);
     assert.equal(res.code, 0, res.stderr);
     assert.equal((await t.db.one('SELECT count(*)::int AS n FROM barcodes')).n, 20);
+  });
+
+  it('maps:rebuild derives the review address from the Place ID again: a dry run first, then --yes, and only for Maps barcodes', async () => {
+    const [current, stale] = [mapsPlace(1), mapsPlace(2)];
+    const old = 'https://old-format.example/review?id=';
+    await insertBarcodes(t.ctx, [
+      { name: 'Sudah sesuai', targetType: 'maps_review', targetUrl: current.reviewUrl, mapsPlaceId: current.placeId, mapsSourceUrl: current.url },
+      { name: 'Format lama', targetType: 'maps_review', targetUrl: `${old}${stale.placeId}`, mapsPlaceId: stale.placeId, mapsSourceUrl: stale.url },
+      { name: 'Website biasa', targetUrl: 'https://contoh.com/situs' },
+      { name: 'Belum diisi', targetType: 'maps_review', targetUrl: null },
+    ]);
+    const urls = async () => (await t.db.rows('SELECT code, target_url FROM barcodes ORDER BY id')).map((r) => r.target_url);
+    const before = await urls();
+
+    let res = await run('rebuild-review-urls.js');
+    assert.equal(res.code, 0, res.stderr);
+    assert.match(res.stdout, /2 barcode Ulasan Google Maps, 1 perlu diperbarui/);
+    assert.ok(res.stdout.includes(stale.reviewUrl), 'shows what the address will become');
+    assert.match(res.stdout, /Tidak ada yang diubah/);
+    assert.deepEqual(await urls(), before, 'a dry run writes nothing');
+
+    res = await run('rebuild-review-urls.js', ['--yes']);
+    assert.equal(res.code, 0, res.stderr);
+    assert.match(res.stdout, /1 barcode diperbarui/);
+    assert.deepEqual(await urls(), [current.reviewUrl, stale.reviewUrl, 'https://contoh.com/situs', null], 'only the outdated Maps barcode changed');
+    assert.equal((await t.db.one("SELECT maps_place_id FROM barcodes WHERE name = 'Format lama'")).maps_place_id, stale.placeId, 'the Place ID is untouched: it is the source of truth');
+
+    res = await run('rebuild-review-urls.js', ['--yes']);
+    assert.match(res.stdout, /Semua sudah sesuai format terbaru/);
   });
 });

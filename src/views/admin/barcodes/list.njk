@@ -3,8 +3,6 @@
 
 {% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
 
-{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
-
 {% block content %}
 {% call page_header('Semua Barcode', (total | num) ~ ' barcode' ~ (' cocok dengan filter' if hasFilters else ' terdaftar') ~ '. Cari, ubah tujuan, unduh QR, atau lakukan aksi massal.') %}
   <details class="menu">
@@ -115,7 +113,7 @@
           <td class="c-target">
             {% if b.target_url %}
             <a class="target-link" href="{{ b.target_url }}" target="_blank" rel="noopener noreferrer" title="{{ b.target_url }}">
-              {{ icon(typeIcons[b.target_type] or 'globe', 16) }}<span class="truncate">{{ b.target_url | displayUrl }}</span>
+              {{ icon(targetTypeIcons[b.target_type] or 'globe', 16) }}<span class="truncate">{{ b.target_url | displayUrl }}</span>
             </a>
             {% else %}
             <span class="target-link target-link--empty">{{ icon('pencil-simple', 16) }}<span class="truncate">Belum diisi</span></span>
@@ -135,6 +133,7 @@
                   <a class="menu__item" href="/admin/barcodes/{{ b.code }}/qr.png?download=1">{{ icon('download-simple', 18) }} Download QR (PNG)</a>
                   <a class="menu__item" href="/admin/barcodes/{{ b.code }}/qr.svg?download=1">{{ icon('download-simple', 18) }} Download QR (SVG)</a>
                   <a class="menu__item" href="/admin/barcodes/{{ b.code }}/print" target="_blank" rel="noopener">{{ icon('printer', 18) }} Cetak QR</a>
+                  {% if b.target_type == 'maps_review' or not b.target_url %}<a class="menu__item" href="/admin/barcodes/{{ b.code }}/print?layout=card" target="_blank" rel="noopener">{{ icon('star', 18) }} Cetak kartu</a>{% endif %}
                   {% if canWrite %}
                   <div class="menu__sep"></div>
                   <form class="menu__form" method="post" action="/admin/barcodes/{{ b.code }}/status">

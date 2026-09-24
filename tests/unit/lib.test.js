@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { formatSequentialCode, generateRandomCode, normalizeCode } from '../../src/lib/codes.js';
+import { formatSequentialCode, generateRandomCode, isUnguessableCode, normalizeCode } from '../../src/lib/codes.js';
 import { CSV_BOM, canonicalHeader, csvCell, csvLine, detectDelimiter, parseCsv } from '../../src/lib/csv.js';
 import {
   addDays, daysInclusive, formatDate, formatDateTime, isValidDateOnly, nowLocalSql, parseLocalDateTime, startOfMonth, startOfWeek,
@@ -27,6 +27,23 @@ describe('codes', () => {
       seen.add(c);
     }
     assert.equal(seen.size, 5000);
+  });
+
+  it('a random code always has a letter, and only random codes count as unguessable', () => {
+    for (let i = 0; i < 20000; i += 1) {
+      const c = generateRandomCode('BR');
+      assert.match(c, /^BR-[2-9A-HJKMNP-Z]{8}$/);
+      assert.ok(/[A-Z]/.test(c.slice(3)), `${c} has no letter`);
+      assert.equal(isUnguessableCode(c), true, c);
+    }
+    // sequential codes are digits only, however long they grow: they can be counted through
+    for (const counted of ['BR-000001', 'BR-000037', 'BR-999999', 'BR-1000000', 'BR-23456789']) assert.equal(isUnguessableCode(counted), false, counted);
+    // anything that is not shaped like a code, or is too short to be one of ours, never qualifies
+    for (const other of ['', 'BR', 'BR-', 'BR-AB2', 'BR-ABCDEFG', 'br-7k3m9qxt', 'BR-7K3M9QX!', "BR-7K3M9QXT'; --", 'B1-7K3M9QXT', undefined, null, 42]) {
+      assert.equal(isUnguessableCode(other), false, String(other));
+    }
+    assert.equal(isUnguessableCode('BR-7K3M9QXT'), true);
+    assert.equal(isUnguessableCode('QR-0000000A'), true, 'other prefixes work the same');
   });
 
   it('normalizeCode upper-cases and rejects anything that is not a code', () => {

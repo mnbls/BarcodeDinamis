@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { normalizeCode } from '../../lib/codes.js';
+import { isUnguessableCode, normalizeCode } from '../../lib/codes.js';
 import { redirectLimiters } from '../../middleware/rate-limit.js';
 import { needsHandoffPage } from '../barcodes/targets.js';
-import { resolveForRedirect } from '../barcodes/barcodes.repo.js';
+import { getEditToken, resolveForRedirect } from '../barcodes/barcodes.repo.js';
 
 const PAGES = {
   'not-found': { status: 404, title: 'Barcode Tidak Ditemukan', message: 'Kode yang Anda pindai tidak terdaftar. Periksa kembali barcode tersebut atau hubungi pihak yang membagikannya.' },
@@ -26,7 +26,8 @@ const PREFETCH = /prefetch|preview/i;
  *   1. look the code up         (optional in-memory cache)
  *   2. active?                  -> else "Barcode Tidak Aktif"
  *   3. expired?                 -> else "Barcode Sudah Tidak Berlaku"
- *   4. destination filled in?   -> else "Barcode Belum Diisi"
+ *   4. destination filled in?   -> else the card is waiting for its owner: redirect to its activation page (its edit
+ *                                  link), or "Barcode Belum Diisi" when that is not allowed (see openActivation)
  *   5. redirect (302, never cached), THEN record the scan without delaying the visitor
  */
 export function createRedirectRouter(ctx) {
@@ -40,6 +41,24 @@ export function createRedirectRouter(ctx) {
       .status(page.status)
       .set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' })
       .render('errors/barcode', { ...page, kind, code: kind === 'not-found' ? null : code });
+  }
+
+  /**
+   * A barcode without a destination is a card that waits for its owner. Scanning it takes the scanner to the card's own
+   * activation page (/e/{token}, the edit link), where the Google Maps link is entered; nothing has to be handed over
+   * separately. That page is a secret address, so this happens only when
+   *   - the code cannot be guessed (isUnguessableCode): otherwise anybody could count through BR-000001, BR-000002, ... and
+   *     collect the address of every card that has not been activated yet. Codes of such cards are random by construction;
+   *   - the barcode still has an edit link (an admin may have revoked it).
+   * In every other case the scanner gets the plain "Belum Diisi" page and learns nothing. Once the destination is filled in,
+   * the scan goes there and the secret never leaves the server again. Not a scan: nothing is recorded.
+   */
+  async function openActivation(res, barcode, code) {
+    if (!isUnguessableCode(code)) return showPage(res, 'pending', code);
+    const token = await getEditToken(db, barcode.id); // never cached: replacing or revoking the link works at once
+    if (!token) return showPage(res, 'pending', code);
+    res.set({ 'Cache-Control': 'no-store, max-age=0', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+    return res.redirect(302, `/e/${token}`);
   }
 
   router.get('/b/:code', limiters, async (req, res, next) => {
@@ -57,7 +76,7 @@ export function createRedirectRouter(ctx) {
       if (!barcode) return showPage(res, 'not-found');
       if (barcode.status !== 'active') return showPage(res, 'inactive', code);
       if (barcode.expired_at && barcode.expired_at.getTime() <= Date.now()) return showPage(res, 'expired', code);
-      if (barcode.target_url === null) return showPage(res, 'pending', code);
+      if (barcode.target_url === null) return await openActivation(res, barcode, code);
 
       res.set({ 'Cache-Control': 'no-store, max-age=0', 'X-Robots-Tag': 'noindex, nofollow' });
 

@@ -1,4 +1,5 @@
 import { isValidDateOnly, nowLocalSql, parseLocalDateTime, toInputDateTime } from '../../lib/dates.js';
+import { parseMapsLink } from '../../lib/google-maps.js';
 import { cleanLine, cleanMultiline } from '../../lib/text.js';
 import { buildTarget, TARGET_TYPES } from './targets.js';
 
@@ -15,15 +16,26 @@ export const STATUSES = ['active', 'inactive'];
  * @param {string[]} [opts.allowedTypes]     restrict target types (import allows 'url' only)
  * @param {boolean} [opts.allowEmpty]        a completely blank destination is accepted and means "fill in
  *        later": targetUrl is null. A half-filled one (an extra text but no value) is still an error.
- * @returns {{ targetType: string, targetUrl: string|null, errors: Record<string,string> }}
+ * @returns {{ targetType: string, targetUrl: string|null, mapsInput: string|null, errors: Record<string,string> }}
+ *   For the type "maps_review" the pasted Google Maps link is only CHECKED here (allowed host, shape): mapsInput is the
+ *   normalised link and targetUrl stays null until the barcode service has turned the link into a Place ID and the
+ *   review address (that may need the network, which this pure function must not use).
  */
 export function validateTarget(input, ctx, { allowedTypes = TARGET_TYPES, allowEmpty = false } = {}) {
   const errors = {};
   const targetType = cleanLine(input.target_type || 'url').toLowerCase();
   let targetUrl = null;
+  let mapsInput = null;
 
   if (!allowedTypes.includes(targetType)) {
     errors.target_type = 'Tipe tujuan tidak dikenal.';
+  } else if (targetType === 'maps_review') {
+    const value = input.target_value ?? input.target_url;
+    if (!(allowEmpty && String(value ?? '').trim() === '')) {
+      const parsed = parseMapsLink(value);
+      if (parsed.ok) mapsInput = parsed.href;
+      else errors.target_value = parsed.error;
+    }
   } else {
     const value = input.target_value ?? input.target_url;
     const blank = String(value ?? '').trim() === '' && String(input.target_extra ?? '').trim() === '';
@@ -33,7 +45,7 @@ export function validateTarget(input, ctx, { allowedTypes = TARGET_TYPES, allowE
       else Object.assign(errors, built.errors);
     }
   }
-  return { targetType, targetUrl, errors };
+  return { targetType, targetUrl, mapsInput, errors };
 }
 
 /**
@@ -47,7 +59,9 @@ export function validateTarget(input, ctx, { allowedTypes = TARGET_TYPES, allowE
  * @param {string|Date|null} [opts.currentExpiredAt]  when editing: the stored value; an unchanged
  *        expiry is accepted even if it lies in the past.
  * @returns {{ values: object, errors: Record<string,string> }}
- *   values.targetUrl is null for a barcode whose destination has not been filled in yet.
+ *   values.targetUrl is null for a barcode whose destination has not been filled in yet, and also (for now) for a
+ *   "maps_review" one: values.mapsInput holds the pasted Maps link until the service has resolved it into
+ *   targetUrl + mapsPlaceId + mapsSourceUrl (which are null for every other type).
  *   values.expiredLocal is a local wall-clock string ("YYYY-MM-DD HH:mm:ss") or null. PostgreSQL turns it
  *   into an instant with AT TIME ZONE, so no timezone arithmetic happens in JavaScript.
  */
@@ -61,7 +75,7 @@ export function validateBarcodeInput(input, ctx, { allowedTypes = TARGET_TYPES, 
   const description = cleanMultiline(input.description);
   if (Array.from(description).length > LIMITS.description) errors.description = `Keterangan maksimal ${LIMITS.description} karakter.`;
 
-  const { targetType, targetUrl, errors: targetErrors } = validateTarget(input, ctx, { allowedTypes, allowEmpty: allowEmptyTarget });
+  const { targetType, targetUrl, mapsInput, errors: targetErrors } = validateTarget(input, ctx, { allowedTypes, allowEmpty: allowEmptyTarget });
   Object.assign(errors, targetErrors);
 
   const statusRaw = cleanLine(input.status || 'active').toLowerCase();
@@ -83,7 +97,7 @@ export function validateBarcodeInput(input, ctx, { allowedTypes = TARGET_TYPES, 
   }
 
   return {
-    values: { name, description: description || null, targetType, targetUrl, status, expiredLocal },
+    values: { name, description: description || null, targetType, targetUrl, mapsInput, mapsPlaceId: null, mapsSourceUrl: null, status, expiredLocal },
     errors,
   };
 }

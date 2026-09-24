@@ -3,20 +3,20 @@
 
 {% block scripts %}<script src="/assets/js/barcodes.js?v={{ assetVersion }}" defer></script>{% endblock %}
 
-{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
-
 {% block content %}
 {% set currentType = form.target_type or 'url' %}
 {% set meta = targetTypeMeta[currentType] or targetTypeMeta['url'] %}
 {# A destination may be left blank while creating, and while a barcode has never had one. Once filled it stays filled. #}
 {% set targetOptional = (not editing) or (barcode and not barcode.target_url) %}
+{# Creating: the optional destination stays closed unless something was typed in it or it has an error to show. #}
+{% set openTarget = errors.target_type or errors.target_value or errors.target_extra or form.target_value or form.target_extra %}
 
 <nav class="crumbs" aria-label="Breadcrumb">
   <a href="/admin/barcodes">Semua Barcode</a>{{ icon('caret-right', 12) }}
   {% if editing %}<a class="mono" href="/admin/barcodes/{{ barcode.code }}">{{ barcode.code }}</a>{{ icon('caret-right', 12) }}<span>Edit</span>{% else %}<span>Buat Barcode</span>{% endif %}
 </nav>
 
-{{ page_header('Edit barcode' if editing else 'Buat barcode baru', 'Ubah nama, tujuan, status, atau masa berlaku. QR Code yang sudah dicetak tetap berlaku.' if editing else 'Sistem membuat kode unik dan QR Code. QR hanya berisi alamat sistem, jadi tujuannya bisa diisi atau diganti kapan saja.') }}
+{{ page_header('Edit barcode' if editing else 'Buat barcode baru', 'Ubah nama, tujuan, status, atau masa berlaku. QR Code yang sudah dicetak tetap berlaku.' if editing else 'Cukup beri nama. Sistem langsung membuat kode unik, QR Code, dan link edit. QR hanya berisi alamat sistem, jadi tujuannya bisa diisi atau diganti kapan saja.') }}
 
 {% if errors and (errors | length) %}
   <div class="alert alert--danger mb-16" role="alert">
@@ -49,13 +49,26 @@
 
       <section class="form-section">
         <h2 class="form-section__title">Tujuan</h2>
+        {% if editing %}
         <p class="form-section__sub">Ke mana pemindai diarahkan. {{ 'Boleh dikosongkan dulu dan diisi nanti.' if targetOptional else 'Bagian inilah yang bisa Anda ubah setelah QR dicetak.' }}</p>
 
         {% if targetOptional %}
         <div class="alert alert--info mb-16">
           {{ icon('link', 20) }}
-          <div><strong>Belum tahu tujuannya?</strong> Kosongkan isian di bawah. Setelah barcode dibuat, Anda mendapat link edit yang bisa dikirim ke orang lain: siapa pun yang memegangnya bisa mengisi tujuan tanpa login.</div>
+          <div><strong>Belum tahu tujuannya?</strong> Kosongkan isian di bawah. Selama kosong, yang memindai QR dibawa ke halaman aktivasi untuk memasukkan link Google Maps, atau tujuan diisi lewat link edit tanpa login yang bisa dikirim ke orang lain.</div>
         </div>
+        {% endif %}
+        {% else %}
+        {# Creating: no link is asked for. The barcode is made at once and its own edit link is the way in (see redirect.routes.js).
+           Somebody who already knows the destination can still give it here, tucked away and closed unless it holds input or errors. #}
+        <p class="form-section__sub">Tidak perlu diisi sekarang.</p>
+        <div class="alert alert--info mb-16">
+          {{ icon('link', 20) }}
+          <div><strong>Tidak perlu mengisi link.</strong> Barcode langsung dibuat dan siap dicetak, lengkap dengan link edit-nya. Saat dipindai pertama kali, pemindai dibawa ke halaman aktivasi untuk memasukkan link Google Maps. Setelah itu QR mengarah ke halaman ulasan Google.</div>
+        </div>
+        <details class="optional-target"{% if openTarget %} open{% endif %}>
+          <summary>{{ icon('plus', 14, 'optional-target__open') }}{{ icon('minus', 14, 'optional-target__close') }}Sudah tahu tujuannya? Isi sekarang (opsional)</summary>
+          <div class="optional-target__body">
         {% endif %}
 
         <div class="field">
@@ -64,7 +77,7 @@
             {% for t, lbl in targetTypeLabels %}
             <label class="type-option">
               <input type="radio" name="target_type" value="{{ t }}"{% if currentType == t %} checked{% endif %}>
-              <span>{{ icon(typeIcons[t], 22) }}{{ lbl }}</span>
+              <span>{{ icon(targetTypeIcons[t], 22) }}{{ lbl }}</span>
             </label>
             {% endfor %}
           </div>
@@ -84,6 +97,10 @@
           <p class="field__hint" data-extra-hint>{{ meta.extra.hint if meta.extra else '' }}</p>
           {{ field_error(errors, 'target_extra') }}
         </div>
+        {% if not editing %}
+          </div>
+        </details>
+        {% endif %}
       </section>
 
       <section class="form-section">
@@ -124,12 +141,11 @@
       {% else %}
         <h3>Cara kerjanya</h3>
         <ol>
-          <li>Sistem membuat kode unik, misalnya <span class="mono">BR-000001</span>.</li>
-          <li>QR Code hanya berisi <span class="mono">{{ app.url }}/b/BR-000001</span>, bukan tujuan Anda.</li>
-          <li>Saat dipindai, sistem membaca tujuan dari database lalu mengarahkan pemindai.</li>
+          <li>Sistem membuat kode acak, misalnya <span class="mono">BR-7K3M9QXT</span>, dan QR Code. QR hanya berisi <span class="mono">{{ app.url }}/b/{kode}</span>, bukan tujuan.</li>
+          <li>Saat dipindai pertama kali, pemindai dibawa ke halaman aktivasi untuk memasukkan link Google Maps.</li>
+          <li>Setelah itu QR mengarah ke halaman ulasan Google, dan tujuannya bisa diganti kapan saja tanpa mencetak ulang.</li>
         </ol>
-        <p>Jadi tujuan bisa diganti kapan saja tanpa mencetak ulang.</p>
-        <p>Tujuan boleh dikosongkan. Barcode tetap dibuat, dan Anda mendapat link edit untuk mengisinya nanti, oleh siapa pun yang Anda beri link itu.</p>
+        <p>Kodenya acak supaya tidak bisa ditebak: barcode yang belum diisi membuka link edit-nya sendiri saat dipindai, dan link itu tidak boleh bisa dikumpulkan orang lain dengan menghitung kode.</p>
       {% endif %}
     </aside>
   </div>

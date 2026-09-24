@@ -473,7 +473,7 @@ kbd {
 .mb-16 { margin-bottom: 16px; }
 
 /* ---- destination type picker (admin form and the public edit page) ------------------------------------ */
-.type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; }
 .type-option { position: relative; }
 .type-option input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
 .type-option span {

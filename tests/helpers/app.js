@@ -5,8 +5,10 @@ import { createApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config/index.js';
 import { createContext } from '../../src/context.js';
 import { migrateUp } from '../../src/db/migrate.js';
+import { buildPlaceId, reviewUrlFor } from '../../src/lib/google-maps.js';
 import * as barcodes from '../../src/modules/barcodes/barcodes.repo.js';
 import { createUser } from '../../src/modules/auth/auth.service.js';
+import { createMapsResolver } from '../../src/modules/maps/maps.resolver.js';
 
 dotenv.config({ path: path.resolve(import.meta.dirname, '..', '..', '.env'), quiet: true });
 
@@ -27,6 +29,8 @@ export function testConfig(overrides = {}) {
     NODE_ENV: 'test',
     DATABASE_URL: url,
     APP_URL: 'https://barcode.test',
+    APP_NAME: 'Dynamic Barcode', // names on screen must not depend on the developer's .env
+    BRAND_NAME: 'Riview Yuk',
     APP_TIMEZONE: 'Asia/Jakarta',
     SESSION_SECRET: 'test-secret-'.padEnd(48, 'x'),
     BCRYPT_ROUNDS: '4',
@@ -55,11 +59,38 @@ export async function resetDb(db) {
   await db.query('ALTER SEQUENCE barcode_code_seq RESTART WITH 1');
 }
 
-/** Boots the whole application against the test database. */
-export async function startApp(overrides = {}) {
+/**
+ * A Google Maps resolver that cannot reach the network: long links resolve (that needs no request), short links fail
+ * with the friendly error. Every test app gets this by default, so no test can ever contact Google by accident.
+ */
+export const offlineMaps = () =>
+  createMapsResolver({
+    fetch: async (url) => {
+      throw new Error(`the tests must not use the network (asked for ${url})`);
+    },
+  });
+
+/**
+ * A made-up but well-formed Google Maps place: its long URL carries a location id, and placeId/reviewUrl are what the
+ * system must derive from it. Different n, different place.
+ */
+export function mapsPlace(n = 1) {
+  const high = 0x2e7a5919022e4800n + BigInt(n);
+  const low = 0x40f12d5bc33d3f00n + BigInt(n);
+  const placeId = buildPlaceId(high, low);
+  return {
+    placeId,
+    reviewUrl: reviewUrlFor(placeId),
+    url: `https://www.google.com/maps/place/Toko+Contoh+${n}/@-7.7381968,110.3834826,17z/data=!4m9!3m8!1s0x${high.toString(16)}:0x${low.toString(16)}!5m2!4m1!1i2!8m2!3d-7.738!4d110.383`,
+    shortUrl: `https://maps.app.goo.gl/Contoh${n}`,
+  };
+}
+
+/** Boots the whole application against the test database. `contextOverrides` replaces shared services (e.g. `maps`). */
+export async function startApp(overrides = {}, contextOverrides = {}) {
   const config = testConfig(overrides);
   await migrateUp({ databaseUrl: config.db.url, ssl: config.db.ssl });
-  const ctx = createContext(config);
+  const ctx = createContext(config, { maps: offlineMaps(), ...contextOverrides });
   const app = createApp(ctx);
   await resetDb(ctx.db);
   return {
@@ -107,18 +138,62 @@ export async function postForm(agent, url, fields = {}, { tokenPage = '/admin' }
 
 /**
  * Inserts barcodes directly (fast path for tests that are not about creation).
- * `targetUrl: null` creates a barcode that is still waiting for its destination.
+ * `targetUrl: null` creates a barcode that is still waiting for its destination. The codes follow CODE_MODE (sequential
+ * in the tests: BR-000001, ...) unless `codeMode: 'random'` is given.
  */
-export async function insertBarcodes(ctx, rows, createdBy = null) {
+export async function insertBarcodes(ctx, rows, createdBy = null, { codeMode } = {}) {
   const prepared = rows.map((r) => ({
     name: r.name ?? 'Barcode Uji',
     description: r.description ?? null,
     targetType: r.targetType ?? 'url',
     targetUrl: r.targetUrl === undefined ? 'https://example.com/tujuan' : r.targetUrl,
+    mapsPlaceId: r.mapsPlaceId ?? null,
+    mapsSourceUrl: r.mapsSourceUrl ?? null,
     status: r.status ?? 'active',
     expiredLocal: r.expiredLocal ?? null,
   }));
-  return ctx.db.tx((tx) => barcodes.insertRows(tx, ctx.config, prepared, { createdBy }));
+  return ctx.db.tx((tx) => barcodes.insertRows(tx, ctx.config, prepared, { createdBy, codeMode }));
+}
+
+/**
+ * A card that waits for its owner, made the way the admin form makes one: no destination and a random code (a code that
+ * cannot be guessed is what lets a scan open the activation page). Returns { code, token, link }.
+ */
+export async function waitingCard(app, fields = {}) {
+  const [inserted] = await insertBarcodes(app.ctx, [{ name: 'Kartu Menunggu', targetUrl: null, ...fields }], null, { codeMode: 'random' });
+  const token = await editTokenOf(app.ctx, inserted.code);
+  return { code: inserted.code, token, link: `/e/${token}` };
+}
+
+/** The code a create form redirected to (`/admin/barcodes/BR-7K3M9QXT#link-edit`), or null. */
+export const createdCode = (res) => /\/admin\/barcodes\/([A-Z0-9-]+)/.exec(res.headers.location ?? '')?.[1] ?? null;
+
+/**
+ * Somebody without an account: no cookies, only the edit link. The link opens the INFO page; the form is a second
+ * page (`${link}/edit`), and that is also where it is submitted.
+ */
+export const linkHolder = (t) => ({
+  open: (link) => t.request().get(link),
+  form: (link) => t.request().get(`${link}/edit`),
+  save: (link, fields) => t.request().post(`${link}/edit`).type('form').send(fields),
+});
+
+/**
+ * A scripted stand-in for Google's short-link service: answers each short link from a table (value = the Location it
+ * redirects to, an Error to throw, or a function returning a response) and records every request it was asked for.
+ * Returns { calls, maps } where `maps` goes into startApp's context overrides.
+ */
+export function fakeGoogle(routes = {}) {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    const target = routes[url];
+    if (!target) throw new Error(`unexpected request to ${url}`);
+    if (target instanceof Error) throw target;
+    if (typeof target === 'function') return target();
+    return { status: 302, headers: new Headers({ location: target }), body: { cancel: async () => {} } };
+  };
+  return { calls, maps: createMapsResolver({ fetch: fetchImpl }) };
 }
 
 /** The secret of a barcode's edit link (read straight from the database; the app only shows it to admins). */

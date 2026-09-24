@@ -109,6 +109,7 @@ export function loadConfig(env = process.env) {
     version,
     rootDir: ROOT_DIR,
     appName: str('APP_NAME', 'Dynamic Barcode'),
+    brandName: str('BRAND_NAME', 'Riview Yuk'), // what the person holding a card sees on the activation pages (/e/...)
     appUrl,
     appOrigin,
     host: str('HOST', isProd ? '0.0.0.0' : '127.0.0.1'),
@@ -161,6 +162,11 @@ export function loadConfig(env = process.env) {
 
     publicPageRateLimit: {
       max: int('PUBLIC_PAGE_RATE_LIMIT_MAX', 120, { min: 1 }), // requests per minute per IP for the login page
+    },
+
+    // Google Maps links: short links are expanded by asking Google (redirect header only, max 5 hops, Google domains only).
+    maps: {
+      timeoutMs: int('MAPS_RESOLVE_TIMEOUT_MS', 4000, { min: 500, max: 15000 }), // per request; the whole lookup never exceeds 10 s
     },
 
     // Public edit links (/e/{token}): no login, so the endpoint is rate limited three ways.

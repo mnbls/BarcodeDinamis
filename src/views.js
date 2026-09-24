@@ -11,6 +11,7 @@ const VIEWS_DIR = path.resolve(import.meta.dirname, 'views');
 export const PUBLIC_DIR = path.resolve(import.meta.dirname, 'public');
 
 const STATE_LABELS = { active: 'Aktif', inactive: 'Nonaktif', expired: 'Kedaluwarsa', pending: 'Belum diisi' };
+const TARGET_TYPE_ICONS = { url: 'globe', whatsapp: 'whatsapp-logo', email: 'envelope-simple', phone: 'phone', maps_review: 'map-pin' };
 const DEVICE_LABELS = { mobile: 'Ponsel', tablet: 'Tablet', desktop: 'Desktop', bot: 'Bot / crawler', unknown: 'Tidak diketahui' };
 
 /** Short hash of the CSS/JS files: appended to asset URLs so browsers fetch new versions after a deploy. */
@@ -42,7 +43,8 @@ export function setupViews(app, config) {
   env.addGlobal('assetVersion', computeAssetVersion());
   env.addGlobal('targetTypeMeta', TARGET_TYPE_META);
   env.addGlobal('targetTypeLabels', TARGET_TYPE_LABELS);
-  env.addGlobal('app', { name: config.appName, url: config.appUrl, version: config.version, env: config.env, timezone: config.timezone });
+  env.addGlobal('targetTypeIcons', TARGET_TYPE_ICONS);
+  env.addGlobal('app', { name: config.appName, brand: config.brandName, url: config.appUrl, version: config.version, env: config.env, timezone: config.timezone });
 
   env.addFilter('dt', (v) => formatDateTime(v, config.timezone));
   env.addFilter('date', (v) => formatDate(v, config.timezone));

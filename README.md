@@ -22,7 +22,7 @@ sedikit JavaScript biasa, grafik SVG buatan sendiri, semua font dan ikon disajik
 - [7. Deployment (hosting)](#7-deployment-hosting)
 - [8. Struktur database](#8-struktur-database)
 - [9. Backup dan restore database](#9-backup-dan-restore-database)
-- [Cara kerja](#cara-kerja) | [Link edit tanpa login](#link-edit-tanpa-login) | [Format CSV](#format-csv-import) | [Keamanan](#keamanan) | [Performa 10.000 barcode](#performa-dan-kapasitas-10000-barcode) | [Pengujian](#pengujian) | [Struktur proyek](#struktur-proyek) | [Perintah npm](#perintah-npm) | [Pemecahan masalah](#pemecahan-masalah)
+- [Cara kerja](#cara-kerja) | [Link edit tanpa login](#link-edit-tanpa-login) | [Ulasan Google Maps](#ulasan-google-maps) | [Kartu review cetak](#kartu-review-cetak) | [Format CSV](#format-csv-import) | [Keamanan](#keamanan) | [Performa 10.000 barcode](#performa-dan-kapasitas-10000-barcode) | [Pengujian](#pengujian) | [Struktur proyek](#struktur-proyek) | [Perintah npm](#perintah-npm) | [Pemecahan masalah](#pemecahan-masalah)
 
 ## Fitur
 
@@ -30,8 +30,10 @@ sedikit JavaScript biasa, grafik SVG buatan sendiri, semua font dan ikon disajik
 | --- | --- |
 | Barcode | Buat, ubah, hapus, aktif/nonaktif, kedaluwarsa opsional. Tipe tujuan: Website (http/https), WhatsApp, Email, Telepon. Kode unik `BR-000001` (atau acak, lihat `CODE_MODE`). |
 | QR Code | Preview, unduh **PNG** (resolusi tinggi) dan **SVG** (vektor), halaman **cetak** dengan pilihan ukuran. Error correction level Q (25 %) agar tetap terbaca setelah dicetak. |
-| Redirect | `GET /b/{kode}`: cek aktif, cek kedaluwarsa, catat scan, redirect **302** (tidak pernah di-cache). Halaman jelas untuk "Tidak Ditemukan", "Tidak Aktif", "Sudah Tidak Berlaku", dan "Belum Diisi" (tujuan belum ditentukan). |
-| Isi nanti + link edit | Barcode boleh dibuat **tanpa tujuan**. Setiap barcode punya **link edit** (`/e/{token}`): siapa pun yang memegang link itu membuka halaman info lalu halaman form untuk mengisi atau mengubah tujuannya **tanpa login**. Admin bisa melihat, menyalin, membuat ulang, atau mencabut link dari halaman detail. Lihat [Link edit tanpa login](#link-edit-tanpa-login). |
+| Redirect | `GET /b/{kode}`: cek aktif, cek kedaluwarsa, catat scan, redirect **302** (tidak pernah di-cache). Halaman jelas untuk "Tidak Ditemukan", "Tidak Aktif", dan "Sudah Tidak Berlaku". Barcode yang belum diisi membuka halaman aktivasinya sendiri (lihat [Link edit tanpa login](#link-edit-tanpa-login)). |
+| Isi nanti + link edit | Membuat barcode **tidak meminta link**: cukup nama, barcode langsung jadi (kode acak). Setiap barcode punya **link edit** (`/e/{token}`): siapa pun yang memegang link itu membuka **halaman aktivasi kartu** (kartu bermerek dengan QR dan tiga langkah aktivasi) lalu halaman form dengan **satu isian kosong, "Masukkan Maps"**, tanpa login. Admin bisa melihat, menyalin, membuat ulang, atau mencabut link dari halaman detail. Lihat [Link edit tanpa login](#link-edit-tanpa-login). |
+| Ulasan Google Maps | Tempel link Google Maps (pendek atau panjang); sistem menghitung **Place ID** dan QR mengarah ke halaman tulis ulasan Google tempat itu. Tersedia di form admin dan di link edit. Lihat [Ulasan Google Maps](#ulasan-google-maps). |
+| Kartu review cetak | Untuk barcode Ulasan Google Maps atau yang belum diisi, halaman cetak punya **kartu review** dua sisi (depan dengan QR, belakang dengan tiga langkah), ukuran kartu ID-1 atau besar, warna gelap atau terang, siap disimpan sebagai PDF. Lihat [Kartu review cetak](#kartu-review-cetak). |
 | Statistik | Dashboard, Scan Analytics (7/30/90 hari, bulan ini, rentang kustom), per barcode: total, hari ini, minggu ini, bulan ini, grafik harian, perangkat, browser, sistem operasi, barcode terpopuler. |
 | Riwayat | Setiap pengisian atau perubahan URL tujuan tercatat: waktu, URL lama, URL baru, dan siapa (admin, atau "Link edit" beserta IP-nya). |
 | Massal | Import CSV (laporan berhasil/gagal per baris), export CSV, aksi massal (aktifkan, nonaktifkan, hapus, export) termasuk "pilih semua hasil filter". |
@@ -41,7 +43,7 @@ sedikit JavaScript biasa, grafik SVG buatan sendiri, semua font dan ikon disajik
 
 ## 1. Cara install
 
-Kebutuhan: **Node.js 20.11+** (diuji di Node 24) dan **PostgreSQL 13+** (diuji di PostgreSQL 17; versi lain belum dicoba).
+Kebutuhan: **Node.js 20.11+** (seluruh tes lulus di Node 20.20 dan Node 24) dan **PostgreSQL 13+** (diuji di PostgreSQL 17; versi lain belum dicoba).
 
 ```bash
 git clone <repo-anda> dynamic-barcode      # atau salin foldernya
@@ -107,7 +109,8 @@ Yang sering diubah:
 | `PORT`, `HOST` | `3000`, `127.0.0.1` (production: `0.0.0.0`) | Alamat listen. |
 | `TRUST_PROXY` | `0` | Jumlah proxy tepercaya (Nginx = `1`). **Wajib diisi bila di belakang proxy**, kalau tidak semua pengunjung tampak berasal dari satu IP. |
 | `APP_TIMEZONE` | `Asia/Jakarta` | Batas hari untuk "scan hari ini" dan tampilan tanggal (`23-09-2026 10:00`). |
-| `CODE_MODE`, `CODE_PREFIX` | `sequential`, `BR` | `random` menghasilkan kode tak bisa ditebak (`BR-7K3M9QXT`). |
+| `BRAND_NAME` | `Riview Yuk` | Nama merek di halaman aktivasi kartu (link edit `/e/...`) yang dilihat pemegang kartu dan di kartu review cetak: judul tab, logo, dan kartu. Panel admin, halaman login, dan halaman status scan tetap memakai `APP_NAME`. |
+| `CODE_MODE`, `CODE_PREFIX` | `sequential`, `BR` | `random` menghasilkan kode tak bisa ditebak (`BR-7K3M9QXT`). Barcode yang dibuat **tanpa tujuan** (kartu yang menunggu aktivasi) selalu memakai kode acak, apa pun `CODE_MODE`. |
 | `QR_ERROR_CORRECTION` | `Q` | `L`/`M`/`Q`/`H`. |
 | `REDIRECT_CACHE_TTL_MS` | `0` | Cache lookup di memori. `0` = selalu baca DB (perubahan langsung berlaku). |
 | `REDIRECT_RATE_LIMIT_MAX` | `600`/menit/IP | Batas umum endpoint redirect. |
@@ -115,6 +118,7 @@ Yang sering diubah:
 | `LOGIN_RATE_LIMIT_MAX` | `10` per 15 menit | Percobaan login gagal per IP + username. |
 | `PUBLIC_PAGE_RATE_LIMIT_MAX` | `120`/menit/IP | Batas untuk halaman login (mencegah bot menumpuk session). Session pengunjung yang belum login hanya berumur 1 jam. |
 | `EDIT_LINK_RATE_LIMIT_MAX`, `EDIT_LINK_INVALID_RATE_LIMIT_MAX`, `EDIT_LINK_SAVE_RATE_LIMIT_MAX` | `60`/menit/IP, `10` per 10 menit/IP, `30`/jam/link | Batas link edit: semua permintaan, link yang **tidak dikenal** (menghambat penebakan), dan penyimpanan per link (link bocor tidak bisa membanjiri riwayat). |
+| `MAPS_RESOLVE_TIMEOUT_MS` | `4000` | Batas waktu per permintaan saat server mengurai link pendek Google Maps (500 sampai 15000). Seluruh proses tidak pernah lebih dari 10 detik. |
 | `IP_ANONYMIZE` | `false` | `true` = simpan IP tanpa oktet terakhir (privasi). |
 | `IMPORT_MAX_ROWS`, `IMPORT_MAX_UPLOAD_MB` | `20000`, `5` | Batas import CSV. |
 | `AUTO_MIGRATE` | `false` | `true` = jalankan migration otomatis saat start (Docker/PaaS). |
@@ -179,7 +183,16 @@ npm run data:generate -- --reset --yes                 # hapus semua barcode dul
 
 ## 7. Deployment (hosting)
 
-Aplikasi cukup memerlukan **Node.js + PostgreSQL**. Urutan umum di server (VPS Ubuntu sebagai contoh):
+Aplikasi cukup memerlukan **Node.js + PostgreSQL**. Pilihan hosting, dengan catatan apa yang sudah dan belum diuji:
+
+| Pilihan | Cocok? | Catatan |
+| --- | --- | --- |
+| VPS Linux + Nginx + PM2 atau systemd | Ya, jalur yang dirinci di bawah | Instalasi produksi dari nol (`npm ci --omit=dev`, `db:create`, `migrate`, `seed`), PM2 cluster 2 worker termasuk `pm2 reload`, backup dan restore, serta perilaku HTTPS di belakang proxy sudah dicoba, di Windows dengan PostgreSQL 17. Contoh Nginx dan systemd, serta penghentian mulus lewat sinyal Linux, belum dijalankan. |
+| PaaS Node/kontainer + PostgreSQL terkelola (Railway, Render, Fly.io, dsb.) | Bisa, belum diuji di platform-platform itu | Isi `NODE_ENV=production`, `APP_URL`, `DATABASE_URL` (+ `DATABASE_SSL`), `SESSION_SECRET`, `TRUST_PROXY=1`, `AUTO_MIGRATE=true`, `LOG_TO_FILE=false`, lalu buat admin sekali lewat konsol platform (`npm run seed`). Disk PaaS biasanya sementara, jadi backup memakai fitur penyedia database. |
+| Hosting bersama (cPanel/PHP) | Hanya bila menyediakan Node.js 20+ **dan** PostgreSQL | Aplikasi ini proses Node yang terus berjalan, bukan skrip PHP. |
+| Serverless (Vercel, Netlify, Cloudflare Workers) | Tidak | Butuh server yang terus berjalan, koneksi database tetap, dan rate limit/cache di memori proses. |
+
+Urutan umum di server (VPS Ubuntu sebagai contoh):
 
 ```bash
 # 1. kode + dependensi
@@ -214,19 +227,23 @@ keduanya langkah itu dilewati.
 
 Checklist production:
 
+- [ ] Node.js 20.11+ (`node -v`); `npm ci` menolak versi yang lebih lama ([`.npmrc`](.npmrc))
+- [ ] Server boleh membuka koneksi keluar HTTPS ke Google (`maps.app.goo.gl`, `goo.gl`, `g.page`): dipakai untuk mengurai link pendek Google Maps (firewall/egress PaaS)
 - [ ] `NODE_ENV=production`, `APP_URL` = domain final dengan `https://`, `SESSION_SECRET` acak 48+ karakter
+- [ ] File `.env` khusus server ini: jangan menyalin `.env` dari komputer pengembangan (isinya password lokal)
 - [ ] `TRUST_PROXY` sesuai jumlah proxy, HTTPS aktif (cookie session otomatis `Secure`)
 - [ ] Password admin awal sudah diganti lewat menu Pengaturan
 - [ ] Backup terjadwal (bagian 9) dan pernah diuji restore
 - [ ] Port PostgreSQL tidak terbuka ke internet; aplikasi memakai role khusus (bukan superuser)
-- [ ] Log dipantau/di-rotate (`storage/logs/app.log`; contoh logrotate: `daily`, `rotate 14`, `copytruncate`, `compress`)
+- [ ] Log dipantau/di-rotate (`storage/logs/app.log`; contoh siap pakai: [`deploy/logrotate.example`](deploy/logrotate.example))
 
 **Penting**: jangan mengganti domain setelah QR dicetak kecuali domain lama tetap mengarah ke aplikasi ini.
 
 ## 8. Struktur database
 
 PostgreSQL. Skema lengkap: [`db/migrations/0001_init.sql`](db/migrations/0001_init.sql), lalu
-[`0002_edit_links.sql`](db/migrations/0002_edit_links.sql) (tujuan boleh kosong, kolom link edit, asal perubahan riwayat).
+[`0002_edit_links.sql`](db/migrations/0002_edit_links.sql) (tujuan boleh kosong, kolom link edit, asal perubahan riwayat) dan
+[`0003_maps_review.sql`](db/migrations/0003_maps_review.sql) (tipe `maps_review`, kolom `maps_place_id` dan `maps_source_url`).
 
 ```
 users 1---* barcodes 1---* barcode_scans
@@ -239,7 +256,7 @@ users 1---* barcodes 1---* barcode_scans
 | Tabel | Kolom penting | Catatan |
 | --- | --- | --- |
 | `users` | `id`, `name`, `username`, `email`, `password_hash` (bcrypt), `role` (`admin`/`viewer`), `is_active`, `password_changed_at`, `created_at`, `updated_at` | Unik pada `lower(username)` dan `lower(email)`. Mengganti password mengakhiri semua session lain. |
-| `barcodes` | `id`, **`code` (UNIQUE)**, `name`, `description`, `target_type`, `target_url` (**boleh `NULL`** = belum diisi), `status`, `expired_at`, `scan_count`, `last_scanned_at`, **`edit_token`** (UNIQUE bila terisi), `import_batch_id`, `created_by`, `created_at`, `updated_at` | `CHECK` di database menolak `target_url` selain `http(s)://`, `mailto:`, `tel:` (lapisan kedua di bawah validasi aplikasi). `edit_token` = rahasia acak 256 bit untuk link edit; `NULL` = tidak ada link. Status efektif: nonaktif, kedaluwarsa, **belum diisi** (`target_url` kosong), atau aktif. |
+| `barcodes` | `id`, **`code` (UNIQUE)**, `name`, `description`, `target_type`, `target_url` (**boleh `NULL`** = belum diisi), `status`, `expired_at`, `scan_count`, `last_scanned_at`, **`edit_token`** (UNIQUE bila terisi), `import_batch_id`, `created_by`, `created_at`, `updated_at` | `CHECK` di database menolak `target_url` selain `http(s)://`, `mailto:`, `tel:` (lapisan kedua di bawah validasi aplikasi). `edit_token` = rahasia acak 256 bit untuk link edit; `NULL` = tidak ada link. Status efektif: nonaktif, kedaluwarsa, **belum diisi** (`target_url` kosong), atau aktif. `target_type` juga bisa `maps_review`: `maps_place_id` (Place ID `ChIJ...`, **data utama**) dan `maps_source_url` (link Maps yang ditempelkan) terisi tepat ketika barcode bertipe itu dan sudah punya tujuan (dijaga `CHECK` di database). |
 | `barcode_scans` | `id`, `barcode_id`, `scanned_at`, `ip_address` (INET), `user_agent`, `referer`, `device`, `browser`, `operating_system` | Log mentah, hanya ditambah (append-only). Boleh dipangkas tanpa merusak statistik. |
 | `scan_stats_daily` | PK (`barcode_id`, `stat_date`, `device`, `browser`, `operating_system`), `scans` | **Rangkuman harian** yang dibaca semua statistik. Diperbarui atomik pada setiap scan. |
 | `barcode_history` | `id`, `barcode_id`, `old_url` (`NULL` = pengisian pertama), `new_url`, `changed_by`, `changed_via` (`admin`/`edit_link`), `changed_ip`, `changed_at` | Satu baris per perubahan URL tujuan. Perubahan lewat link edit tidak punya `changed_by` (tanpa akun); `changed_ip` mengikuti `IP_ANONYMIZE`. |
@@ -289,26 +306,36 @@ statistik yang dikorbankan, bukan redirect.
 
 Untuk barcode yang tujuannya belum diketahui saat dibuat, atau yang tujuannya akan diisi orang lain:
 
-1. **Buat barcode, kosongkan tujuan.** Barcode tetap dibuat (kode dan QR siap dicetak) dengan status efektif **Belum diisi**.
-   Yang memindainya melihat halaman "Barcode Belum Diisi" (bukan error, dan tidak dihitung sebagai scan).
-2. **Bagikan link edit** dari halaman detail barcode (kartu "Link edit tanpa login"), berbentuk `https://domain-anda/e/{token}`.
-   Setiap barcode baru otomatis punya link. Barcode lama belum punya; klik **Buat link edit** untuk membuatnya.
-3. **Pemegang link membuka dua halaman tanpa login.** Link itu (`/e/{token}`) membuka **halaman info**: QR, kode, nama, status, dan
-   tujuan saat ini, tanpa form. Tombol **Isi tujuan** (atau **Ubah tujuan** bila sudah terisi) membuka **halaman form**
-   (`/e/{token}/edit`): pilih tipe tujuan (website, WhatsApp, email, telepon), isi, lalu simpan. Setelah tersimpan, orangnya kembali ke
-   halaman info yang menampilkan konfirmasi. QR yang sudah dicetak langsung mengarah ke tujuan itu, dan link tetap berlaku untuk
-   perubahan berikutnya.
+1. **Buat barcode tanpa mengisi link.** Form Buat Barcode hanya meminta nama (isian tujuan disembunyikan; buka bila sudah tahu tujuannya).
+   Barcode langsung dibuat: kode **acak** (mis. `BR-7K3M9QXT`, apa pun `CODE_MODE`), QR siap dicetak, dan **link edit** otomatis. Status efektifnya **Belum diisi**.
+2. **Scan pertama membuka halaman aktivasi.** Yang memindai barcode yang belum diisi langsung dibawa ke link edit-nya (`https://domain-anda/e/{token}`),
+   jadi pemilik kartu tidak perlu dikirimi apa pun. Ini tidak dihitung sebagai scan. Halaman "Barcode Belum Diisi" hanya muncul bila link edit dicabut
+   atau kodenya berurutan (lihat catatan keamanan di bawah). Link yang sama tetap bisa dikirim lewat halaman detail (kartu "Link edit tanpa login");
+   barcode lama belum punya link, klik **Buat link edit** untuk membuatnya.
+3. **Pemegang link membuka dua halaman tanpa login.** Link itu (`/e/{token}`) membuka **halaman aktivasi kartu**: kartu bermerek
+   ([`BRAND_NAME`](#3-konfigurasi-env), bawaan "Riview Yuk") berisi QR, kode, nama, dan status, lalu tiga langkah (kartu terdaftar, Masukkan Maps,
+   kartu siap dipindai) yang menunjukkan sampai mana aktivasinya. Halaman ini tidak punya form. Tombol **Aktifkan kartu** (**Ganti lokasi Maps**
+   bila sudah terhubung) membuka **halaman form** (`/e/{token}/edit`) dengan **satu isian yang selalu kosong**: link Google Maps lokasi mereka.
+   Sistem mengubahnya menjadi halaman ulasan Google (lihat [Ulasan Google Maps](#ulasan-google-maps)). Setelah tersimpan, orangnya kembali ke
+   halaman aktivasi yang menampilkan konfirmasi. QR yang sudah dicetak langsung mengarah ke halaman ulasan itu, dan link tetap berlaku bila
+   lokasinya perlu diganti.
 4. **Admin tetap memegang kendali**: melihat setiap pengisian di riwayat (ditandai "Link edit" + IP), **membuat ulang** link
    (link lama langsung mati) atau **mencabutnya**. Menghapus barcode juga mematikan linknya.
 
-Yang bisa dilakukan pemegang link **hanya mengubah tujuan** barcode itu, dengan aturan validasi yang sama dengan form admin
-(http/https saja, dst.), dan tidak bisa mengosongkan tujuan yang sudah terisi. Nama, keterangan, status, masa berlaku, statistik,
-penghapusan, dan barcode lain tidak terjangkau. Halaman info menampilkan kode, nama (bukan keterangan), dan QR agar orangnya tahu
-stiker mana yang ia isi; halaman form hanya berisi isian tujuan. Hanya halaman form yang menerima penyimpanan. Akun `viewer` tidak
-melihat link, karena link adalah hak menulis.
+Yang bisa dilakukan pemegang link **hanya memasukkan link Google Maps** untuk barcode itu. Ia **tidak bisa** mengarahkan barcode ke website
+atau alamat lain (hanya halaman ulasan Google yang bisa dihasilkan), dan tidak bisa mengosongkan Maps yang sudah terisi. Nama, keterangan,
+status, masa berlaku, statistik, penghapusan, dan barcode lain tidak terjangkau. Halaman aktivasi menampilkan kode, nama (bukan keterangan),
+dan QR agar orangnya tahu kartu mana yang ia isi, tetapi tidak menampilkan alamat apa pun; halaman form tidak menampilkan apa yang sudah
+tersimpan. Hanya halaman form yang menerima penyimpanan. Akun `viewer` tidak melihat link, karena link adalah hak menulis.
+Tampilannya murni presentasi: teks dan langkah mengikuti status barcode (belum diisi, aktif, nonaktif, kedaluwarsa), tidak ada logika lain.
 
 Cara linknya diamankan (link adalah kredensial, jadi diperlakukan seperti kata sandi):
 
+- **Memegang kartu = boleh mengaktifkannya, sampai Maps diisi.** Barcode yang belum diisi menyerahkan link edit-nya kepada siapa pun yang memindainya.
+  Karena itu hanya **kode acak** yang boleh melakukannya: dengan kode berurutan (`BR-000001`, `BR-000002`, ...) orang bisa menghitung kode dan
+  mengumpulkan link setiap kartu yang belum aktif dari jauh. Barcode tanpa tujuan selalu dibuat dengan kode acak; barcode dengan kode berurutan
+  (mis. dibuat sebelum fitur ini) tetap menampilkan "Barcode Belum Diisi" dan tidak membuka apa pun. Setelah tujuan terisi, scan langsung ke tujuan dan
+  link edit tidak pernah keluar dari server lagi (simpan alamat halaman aktivasi bila ingin mengganti lokasi nanti, atau minta admin mengirim link-nya).
 - Token acak 256 bit (`crypto.randomBytes(32)`, 43 karakter), tidak bisa ditebak; bentuk yang salah ditolak tanpa menyentuh database.
 - Semua respons di kedua halaman `no-store`, `noindex`, `Referrer-Policy: no-referrer` (token tidak bocor lewat header Referer), tidak bisa di-embed (`frame-ancestors 'none'`), dan `robots.txt` melarang `/e/`.
 - **Tanpa cookie dan tanpa session**: tidak ada yang bisa "ditunggangi" situs lain, sehingga CSRF token tidak dibutuhkan; kredensialnya adalah link itu sendiri.
@@ -317,6 +344,74 @@ Cara linknya diamankan (link adalah kredensial, jadi diperlakukan seperti kata s
 - Tiga rate limit (lihat `EDIT_LINK_*`), batas ukuran body 16 KB, dan penyimpanan dikunci per baris sehingga dua orang yang menyimpan bersamaan tidak merusak riwayat.
 - Link tersimpan apa adanya di database (agar admin bisa menyalinnya lagi), jadi backup database perlu diperlakukan sebagai data sensitif.
   Bila sebuah link tersebar ke orang yang salah: **Cabut** atau **Buat ulang** dari halaman detail.
+
+## Ulasan Google Maps
+
+Tipe tujuan **Ulasan Google Maps**: pemilik tempat menempelkan link lokasinya di Google Maps, dan QR Code mengarah ke halaman
+**tulis ulasan** Google untuk tempat itu (`https://search.google.com/local/writereview?placeid=<Place ID>`). Tipe ini ada di form admin
+(Buat/Edit Barcode) dan menjadi satu-satunya isian di halaman link edit. Dari link Maps sampai link ulasan:
+
+1. **Validasi host.** Hanya `google.com/maps`, `maps.google.*`, `goo.gl/maps`, `maps.app.goo.gl`, dan `g.page` yang diterima (cocok persis:
+   `google.com.evil.test` atau `evilgoogle.com` ditolak). Link tanpa `https://` juga bisa; `http://` dinaikkan ke `https://`.
+2. **Link pendek menjadi URL penuh (hanya `goo.gl`, `maps.app.goo.gl`, `g.page`), di server** karena browser diblokir CORS. Server mengirim
+   GET **tanpa mengikuti redirect otomatis**, hanya membaca header `Location`, membuang isi halamannya (tidak diunduh), dan mengulang maksimal
+   **5 kali**, hanya ke domain Google. Redirect ke tempat lain tidak pernah diikuti (permintaannya pun tidak dikirim). Batas waktu per
+   permintaan `MAPS_RESOLVE_TIMEOUT_MS` (bawaan 4 detik) dan 10 detik untuk seluruh proses.
+3. **ID lokasi** dibaca dari URL yang sudah di-decode: `!1s0xAAAA:0xBBBB` atau `ftid=0xAAAA:0xBBBB`. Cadangan (hanya dipakai bila
+   ID lokasi tidak ada): bila alamat akhirnya sudah membawa Place ID (`placeid=ChIJ...`, mis. hasil dari link ulasan bawaan Google Business
+   Profile `g.page/r/.../review`, atau `place_id:ChIJ...`), Place ID itu dipakai langsung. Untuk link yang punya keduanya, rumus di atas yang menang.
+4. **Place ID** dihitung dari 20 byte `0A 12 09` + AAAA (8 byte little-endian) + `11` + BBBB (8 byte little-endian), di-encode base64url tanpa
+   padding; hasilnya selalu berawalan `ChIJ` (27 karakter). Rumus ini dicocokkan dengan contoh Place ID dari dokumentasi Google dan dengan
+   link Maps asli.
+5. **Link ulasan** dibuat dari Place ID.
+6. **Yang disimpan**: `barcodes.maps_place_id` sebagai **data utama**, `maps_source_url` (link yang ditempelkan) sebagai pelengkap, dan
+   `target_url` berisi link ulasan yang dipakai endpoint redirect. Karena link ulasan selalu bisa dibangun ulang dari Place ID, formatnya
+   mudah diganti: ubah fungsi `reviewUrlFor` di [`src/lib/google-maps.js`](src/lib/google-maps.js) lalu jalankan
+   `npm run maps:rebuild` (pratinjau) dan `npm run maps:rebuild -- --yes` (menulis). QR yang sudah tercetak tidak terpengaruh.
+
+Hal yang perlu diketahui:
+
+- **Server harus bisa membuka koneksi keluar HTTPS ke Google** (`maps.app.goo.gl`, `goo.gl`, `g.page`) untuk mengurai link pendek. Link panjang
+  dari `google.com/maps` tidak memerlukan koneksi apa pun. Bila koneksi keluar diblokir, pengguna melihat pesan "Link pendek tidak bisa
+  dibuka saat ini".
+- Karena server mengambil alamat yang diberikan pengguna, pengamannya berlapis: daftar host di atas, setiap lompatan diperiksa sebelum
+  dikirim, hanya `https`, tanpa username/password/port khusus, batas 5 lompatan dan batas waktu, isi halaman tidak diunduh, dan permintaan
+  ke link edit yang tidak valid tidak pernah memicu permintaan keluar. Permintaan ke Google dilakukan **di luar transaksi database**, jadi
+  jawaban lambat tidak menahan kunci baris barcode.
+- Hanya link yang membawa ID lokasi (`0x...:0x...`) yang bisa dipakai. Link koordinat saja (`google.com/maps?q=-7.7,110.3`) ditolak dengan
+  pesan cara menyalin link yang benar (Bagikan, lalu Salin link). Domain negara seperti `google.co.id/maps` tidak ada di daftar; linknya
+  dari tombol Bagikan (`maps.app.goo.gl`) selalu diterima.
+- Form edit admin menampilkan **link Maps yang ditempelkan**, bukan link ulasan. Menyimpan ulang dengan link yang sama tidak menghubungi
+  Google lagi dan tidak menambah riwayat. Halaman link edit publik selalu kosong saat dibuka.
+- Import CSV tidak bisa membuat tipe ini (hanya URL biasa).
+
+## Kartu review cetak
+
+Untuk barcode tipe **Ulasan Google Maps** dan barcode yang **belum diisi**, halaman cetak (`/admin/barcodes/{kode}/print`) punya pilihan **Kartu review**
+di samping label QR biasa. Tombol **Cetak kartu** di halaman detail dan di menu baris daftar langsung membukanya (`?layout=card`). Barcode dengan tujuan lain
+tidak memilikinya, karena tulisan di kartu ("Pindai untuk menulis ulasan di Google") hanya benar untuk dua jenis itu.
+
+Kartu ini kembaran cetak dari kartu di halaman aktivasi (`/e/{token}`): latar hampir hitam, huruf Geist dan Instrument Serif, lima bintang, dan QR asli di ubin putih,
+dengan nama merek dari [`BRAND_NAME`](#3-konfigurasi-env). Gambarnya memakai satuan relatif terhadap lebar kartu, jadi satu rancangan berlaku untuk kedua ukuran.
+
+| Sisi | Isi |
+| --- | --- |
+| Depan | Merek dan lima bintang, "Bagikan pengalaman Anda", ajakan memindai, QR, nama barcode, dan kodenya. |
+| Belakang | Tiga langkah menulis ulasan, dan alamat pendek (tanpa `https://`) untuk diketik bila pemindaian gagal. |
+
+Pilihan di bilah atas: **Bentuk** (label atau kartu), **Ukuran kartu** (Standar 8,56 × 5,4 cm seperti kartu ID-1, atau Besar 14,5 × 9,2 cm), dan
+**Warna** (Gelap, atau Terang yang hemat tinta dan cocok untuk kertas biasa). Pilihan itu digerakkan CSS `:has()` tanpa skrip, jadi butuh browser yang cukup baru
+(Chrome/Edge 105+, Safari 15.4+, Firefox 121+).
+
+Catatan cetak:
+
+- Simpan sebagai PDF dari dialog cetak browser: halaman 1 = depan, halaman 2 = belakang, masing-masing **seukuran kartu** tanpa margin (`@page` bernama). PDF itu
+  bisa dibawa ke percetakan. Untuk dicetak sendiri di kertas A4, potong mengikuti tepi kartu (kartu Terang punya garis tepi tipis sebagai pemandu).
+- Latar gelap tetap tercetak walau opsi "Background graphics" browser mati (`print-color-adjust: exact`); tanpa itu kartu gelap keluar sebagai huruf putih di kertas putih.
+- Gambarnya persegi penuh: tanpa sudut membulat (percetakan yang memotongnya) dan **tanpa bleed**. Percetakan yang meminta bleed 3 mm perlu versi dengan margin tambahan.
+- Link edit rahasia (`/e/{token}`) **tidak pernah** dicetak di kartu.
+- Diuji: jumlah dan ukuran halaman PDF (Edge headless), latar gelap benar-benar tercetak (dibandingkan dengan kontrol tanpa aturan itu), teks tiap halaman, dan QR pada hasil cetak
+  terbaca pembaca independen (jsQR) di ketiga varian. Belum diuji: printer fisik dan Safari/Firefox.
 
 ## Format CSV import
 
@@ -347,12 +442,13 @@ Produk B,Produk kedua,https://example.com/b,inactive,31-12-2026
 | SQL injection | Query berparameter di seluruh aplikasi; kolom sorting berasal dari daftar putih; wildcard `%`/`_` pada pencarian di-escape |
 | XSS | Auto-escape di semua template; CSP ketat (`script-src 'self'`, tanpa inline script); teks pengguna dibersihkan dari karakter kontrol/bidi; `textContent` untuk toast dan tooltip |
 | URL berbahaya | Hanya `http://` dan `https://` (plus `mailto:`/`tel:` yang dibangun sistem); tolak `javascript:`, `data:`, `file:`, kredensial dalam URL, spasi/kontrol, redirect ke `/b/` milik sendiri; `CHECK` constraint di database |
-| Penebakan kode | Rate limit per IP + batas khusus untuk kode yang tidak ada; opsi kode acak (`CODE_MODE=random`) |
+| Penebakan kode | Rate limit per IP + batas khusus untuk kode yang tidak ada; opsi kode acak (`CODE_MODE=random`). Barcode tanpa tujuan selalu berkode acak, karena scan-nya membuka link edit |
 | Otorisasi | Semua `/admin` wajib login; setiap aksi ubah data memeriksa peran `admin`; area import hanya admin |
 | Kebocoran informasi | Halaman status barcode tidak menampilkan tujuan/DB; error production hanya berisi ID permintaan; `X-Powered-By` dimatikan; header keamanan (Helmet) |
 | CSV | Guard rumus saat export, parser aman, batas ukuran dan jumlah baris, file tidak pernah ditulis ke disk |
 | Open redirect | Parameter `next` dan `return_to` hanya menerima path internal `/admin...` |
-| Link edit tanpa login | Token acak 256 bit sebagai kredensial; tanpa cookie/session; hanya bisa mengubah tujuan (validasi sama dengan admin); 3 rate limit; disamarkan di log; dapat dicabut atau dibuat ulang admin; tidak terlihat oleh `viewer`; setiap perubahan tercatat dengan IP. Rincian di [Link edit tanpa login](#link-edit-tanpa-login) |
+| Link edit tanpa login | Token acak 256 bit sebagai kredensial; tanpa cookie/session; pemegang link **hanya bisa memasukkan link Google Maps** (tidak bisa mengarahkan ke website sembarang); 3 rate limit; disamarkan di log; dapat dicabut atau dibuat ulang admin; tidak terlihat oleh `viewer`; setiap perubahan tercatat dengan IP. Rincian di [Link edit tanpa login](#link-edit-tanpa-login) |
+| Server mengambil alamat dari pengguna (SSRF) | Hanya untuk link pendek Google Maps: daftar host yang ketat, setiap lompatan redirect diperiksa **sebelum** dikirim dan harus ke domain Google, maksimal 5 lompatan, hanya `https`, isi halaman tidak diunduh, batas waktu, tidak ada redirect otomatis, dan tidak dilakukan untuk link edit yang tidak valid. Rincian di [Ulasan Google Maps](#ulasan-google-maps) |
 
 Data yang disimpan tiap scan: waktu, IP (bisa dianonimkan), user agent (dipangkas 512 karakter), referer (hanya asal + path, tanpa query),
 jenis perangkat, browser, OS. Perhatikan kewajiban privasi yang berlaku bagi Anda (mis. UU PDP) sebelum mengaktifkan penyimpanan IP penuh.
@@ -375,7 +471,7 @@ DELETE FROM barcode_scans WHERE scanned_at < now() - interval '365 days';
 ## Pengujian
 
 ```bash
-npm test          # 280 tes: unit + integrasi (butuh TEST_DATABASE_URL, mis. barcode_dinamis_test), sekitar 2,5 menit
+npm test          # 396 tes: unit + integrasi (butuh TEST_DATABASE_URL, mis. barcode_dinamis_test), sekitar 3 menit
 ```
 
 Tes **menolak berjalan** jika nama database tidak berakhiran `_test` karena tabelnya dikosongkan di setiap tes.
@@ -383,9 +479,14 @@ Cakupan: pembuatan dan pengeditan barcode, redirect (aktif, tidak ditemukan, non
 import dan export CSV, aksi massal, statistik scan (zona waktu, minggu/bulan, rollup), riwayat perubahan, keamanan (CSRF, SQLi, XSS, header, error production),
 skrip CLI (`seed`, `admin:create`, `admin:reset`, `data:generate`, `migrate`), kapasitas 10.000 barcode, dan tes khusus **"QR yang sudah dicetak tetap berfungsi setelah URL diubah"**
 (QR di-decode dengan pembaca independen: alamat di dalam QR tidak pernah berubah, 25 kali ganti tujuan, berkas PNG/SVG identik byte demi byte).
-Fitur **isi nanti + link edit** punya tesnya sendiri (`tests/integration/edit-link.test.js`, `tests/unit/edit-link.test.js`): barcode tanpa tujuan, halaman "Belum Diisi",
-halaman info dan halaman form yang terpisah, pengisian tanpa login, link mati/dicabut/dibuat ulang, hanya tujuan yang bisa diubah, validasi, rate limit, penyimpanan serentak, `viewer` tidak melihat link,
+Fitur **isi nanti + link edit** punya tesnya sendiri (`tests/integration/edit-link.test.js`, `edit-link-public.test.js`, `tests/unit/edit-link.test.js`): form buat barcode tanpa isian link dan kode acak untuk barcode tanpa tujuan, scan pertama yang membuka halaman aktivasi (hanya untuk kode acak dan link yang belum dicabut), halaman "Belum Diisi",
+halaman aktivasi dan halaman form yang terpisah (form selalu kosong), tampilan tiap status (belum aktif, aktif, nonaktif, kedaluwarsa), nama merek dari `BRAND_NAME`, pengisian tanpa login, link mati/dicabut/dibuat ulang, hanya link Maps yang bisa dimasukkan, validasi, rate limit, penyimpanan serentak, `viewer` tidak melihat link,
 token tidak muncul di halaman lain maupun di log, dan QR yang dicetak sebelum tujuan ada tetap berfungsi setelah diisi.
+Fitur **Ulasan Google Maps** juga: `tests/unit/google-maps.test.js` (rumus Place ID dengan contoh dari dokumentasi Google, daftar host yang diterima dan ditolak,
+redirect yang meninggalkan Google tidak pernah dikirim, batas 5 lompatan dan batas waktu) dan `tests/integration/maps-admin.test.js` (form admin, `CHECK` di database,
+Google ditanya tanpa menahan kunci baris). Tidak ada tes yang menghubungi jaringan: link pendek dijawab oleh tiruan Google.
+**Kartu review cetak** punya `tests/integration/print-card.test.js`: kartu hanya untuk barcode Maps atau yang belum diisi, `?layout=card` dan nilai yang salah, isi depan dan belakang,
+link edit tidak pernah tercetak, teks berbahaya di-escape, tombol "Cetak kartu", label lama tidak berubah, dan aturan cetak yang rapuh (latar dipaksa tercetak, ukuran halaman, satu kartu per halaman).
 
 ## Struktur proyek
 
@@ -399,14 +500,15 @@ src/
   modules/
     barcodes/      repo (SQL), service (aturan), routes, validasi, tipe tujuan
     redirect/      endpoint /b/{kode} dan cache
-    edit-link/     halaman publik tanpa login: /e/{token} (info) dan /e/{token}/edit (form isi/ubah tujuan)
+    edit-link/     halaman publik tanpa login: /e/{token} (aktivasi kartu) dan /e/{token}/edit (form "Masukkan Maps")
+    maps/          pengurai link Google Maps di server (link pendek, hanya ke domain Google)
     analytics/     pencatat scan, query statistik, rentang tanggal
     imports/       import/export CSV
     auth/  settings/  admin/  public/
   views/           template Nunjucks (layouts, macros, halaman)
   public/          css, js (app, charts, barcodes), font, ikon
 db/migrations/     skema SQL
-scripts/           migrate, seed, admin, generator data, backup, db:create, dev-db.ps1
+scripts/           migrate, seed, admin, generator data, backup, db:create, run-tests, dev-db.ps1
 tests/             unit/ dan integration/
 deploy/            contoh Nginx dan systemd
 ```
@@ -425,6 +527,7 @@ Pemisahan tanggung jawab: **Frontend** (`views`, `public`), **Backend** (`module
 | `npm run seed`, `admin:create`, `admin:reset` | Admin pertama, data contoh, akun baru, reset password |
 | `npm run smoke -- --url <alamat>` | Uji alur lengkap terhadap instance yang berjalan (butuh `SMOKE_USERNAME`/`SMOKE_PASSWORD`) |
 | `npm run data:generate` | Data uji beban (10.000 barcode, scan sintetis) |
+| `npm run maps:rebuild` | Bangun ulang link ulasan semua barcode Google Maps dari Place ID-nya (pratinjau; tambah `-- --yes` untuk menulis) |
 | `npm run db:backup` | Backup `pg_dump` |
 | `npm run icons:build` | Bangun ulang `src/lib/icons.generated.js` dari Phosphor Icons |
 | `npm test` | Seluruh tes |
@@ -438,6 +541,8 @@ Pemisahan tanggung jawab: **Frontend** (`views`, `public`), **Backend** (`module
 | Login berhasil tapi langsung keluar di production | `NODE_ENV=production` dengan `APP_URL` https membuat cookie `Secure`; akses lewat HTTPS dan set `TRUST_PROXY=1` di belakang proxy. |
 | Semua scan tercatat dari satu IP / rate limit terlalu ketat | `TRUST_PROXY` belum diisi di belakang Nginx/Cloudflare. |
 | QR mengarah ke `localhost` | `APP_URL` masih alamat development saat QR dibuat; perbaiki `APP_URL`, restart, unduh ulang QR. |
+| "Link pendek tidak bisa dibuka saat ini" saat memasukkan Maps | Server tidak bisa membuka koneksi keluar HTTPS ke Google (firewall/egress) atau lambat: cek dengan `curl -I https://maps.app.goo.gl/xxxx` dari server, atau naikkan `MAPS_RESOLVE_TIMEOUT_MS`. Link panjang dari `google.com/maps` tetap bisa dipakai. |
+| "ID lokasi tidak ditemukan di link ini" | Link Maps tidak membawa ID lokasi (mis. hanya koordinat). Buka lokasinya di Google Maps, pilih Bagikan, lalu Salin link. |
 | Password di `.env` terpotong | Nilai dengan `#` harus diberi tanda kutip. |
 | Excel membuka CSV dalam satu kolom | Export dengan pemisah "Titik koma" atau impor data lewat Data > From Text/CSV. |
 

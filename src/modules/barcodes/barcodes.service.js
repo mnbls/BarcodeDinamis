@@ -20,9 +20,13 @@ export async function getBarcodeOrThrow(ctx, code) {
   return barcode;
 }
 
-/** Values for pre-filling the edit form from a stored barcode. */
+/**
+ * Values for pre-filling the edit form from a stored barcode. A Google Maps destination is pre-filled with the Maps
+ * link that was pasted (what the admin would edit), not with the review address that the QR leads to.
+ */
 export function formValuesFor(barcode, timezone) {
-  const { value, extra } = parseTarget(barcode.target_type, barcode.target_url);
+  const { value, extra } =
+    barcode.target_type === 'maps_review' ? { value: barcode.maps_source_url ?? '', extra: '' } : parseTarget(barcode.target_type, barcode.target_url);
   return {
     name: barcode.name,
     description: barcode.description ?? '',
@@ -35,19 +39,46 @@ export function formValuesFor(barcode, timezone) {
 }
 
 /**
+ * Turns the pasted Google Maps link of a "maps_review" destination into targetUrl (the review page) + mapsPlaceId +
+ * mapsSourceUrl. Google is contacted only to expand short links (maps.resolver.js), which can take seconds, so this
+ * must run OUTSIDE any transaction. A link that is identical to the one the barcode already has is not resolved again.
+ * Every other type passes through untouched.
+ * @returns {Promise<{ok: true, values: object} | {ok: false, errors: Record<string,string>}>}
+ */
+async function withResolvedMaps(ctx, values, current = null) {
+  if (values.targetType !== 'maps_review' || !values.mapsInput) return { ok: true, values };
+  if (current?.target_type === 'maps_review' && current.maps_place_id && current.maps_source_url === values.mapsInput) {
+    return { ok: true, values: { ...values, targetUrl: current.target_url, mapsPlaceId: current.maps_place_id, mapsSourceUrl: current.maps_source_url } };
+  }
+  const resolved = await ctx.maps.resolve(values.mapsInput);
+  if (!resolved.ok) return { ok: false, errors: { target_value: resolved.error } };
+  return { ok: true, values: { ...values, targetUrl: resolved.reviewUrl, mapsPlaceId: resolved.placeId, mapsSourceUrl: resolved.sourceUrl } };
+}
+
+/**
  * Creates one barcode. Returns { ok: true, barcode } or { ok: false, errors }.
  * The QR encodes only the dynamic /b/{code} URL, so nothing about the destination is baked into it.
- * The destination may be left blank: the barcode then waits in the "pending" state until somebody fills it
- * in, either an admin or a person holding the barcode's edit link.
+ * The destination is normally left blank: the barcode then waits in the "pending" state, and whoever scans it is taken to
+ * its activation page (its own edit link, see redirect.routes.js) to enter the Google Maps link. An admin can also fill
+ * the barcode in later, or give it a destination right away.
+ *
+ * A barcode that waits like this hands its activation link to whoever scans it, so its code must not be guessable:
+ * it always gets a random code, whatever CODE_MODE says. Barcodes created with a destination follow CODE_MODE.
  */
 export async function createBarcode(ctx, input, user) {
   assertWritable(user);
-  const { values, errors } = validateBarcodeInput(input, ctxOf(ctx), { allowEmptyTarget: true });
-  if (Object.keys(errors).length) return { ok: false, errors };
+  const validated = validateBarcodeInput(input, ctxOf(ctx), { allowEmptyTarget: true });
+  if (Object.keys(validated.errors).length) return { ok: false, errors: validated.errors };
 
-  const [inserted] = await ctx.db.tx((tx) => repo.insertRows(tx, ctx.config, [values], { createdBy: user.id }));
+  const maps = await withResolvedMaps(ctx, validated.values);
+  if (!maps.ok) return { ok: false, errors: maps.errors };
+
+  const waiting = maps.values.targetUrl === null;
+  const [inserted] = await ctx.db.tx((tx) =>
+    repo.insertRows(tx, ctx.config, [maps.values], { createdBy: user.id, codeMode: waiting ? 'random' : undefined }),
+  );
   const barcode = await repo.findById(ctx.db, inserted.id);
-  ctx.logger.info({ code: barcode.code, userId: user.id, pending: barcode.target_url === null }, 'barcode created');
+  ctx.logger.info({ code: barcode.code, userId: user.id, pending: barcode.target_url === null, type: barcode.target_type }, 'barcode created');
   return { ok: true, barcode };
 }
 
@@ -55,19 +86,44 @@ export async function createBarcode(ctx, input, user) {
  * Updates a barcode. The row is locked (FOR UPDATE) so two admins editing at once cannot interleave
  * and produce a wrong history. A changed destination writes a barcode_history row in the same
  * transaction. The printed QR never changes: only the database row does.
+ *
+ * A Google Maps link may need a round trip to Google, so that happens first (look at the barcode, resolve the link),
+ * and only then is the row locked and written: nothing waits on the network while holding a lock.
  */
 export async function updateBarcode(ctx, code, input, user) {
   assertWritable(user);
+
+  const peek = await repo.findByCode(ctx.db, code);
+  if (!peek) throw notFound('Barcode tidak ditemukan.');
+  let resolvedMaps = null;
+  const early = validateBarcodeInput(input, ctxOf(ctx), { currentExpiredAt: peek.expired_at, allowEmptyTarget: peek.target_url === null });
+  if (!Object.keys(early.errors).length && early.values.mapsInput) {
+    resolvedMaps = await withResolvedMaps(ctx, early.values, peek);
+    if (!resolvedMaps.ok) return { ok: false, errors: resolvedMaps.errors, current: peek };
+  }
+
   const outcome = await ctx.db.tx(async (tx) => {
     const current = await repo.findByCode(tx, code, { forUpdate: true });
     if (!current) throw notFound('Barcode tidak ditemukan.');
 
     // A destination that is already filled in cannot be blanked again; one that was never filled may stay empty.
-    const { values, errors } = validateBarcodeInput(input, ctxOf(ctx), {
+    const validated = validateBarcodeInput(input, ctxOf(ctx), {
       currentExpiredAt: current.expired_at,
       allowEmptyTarget: current.target_url === null,
     });
+    const { errors } = validated;
+    let { values } = validated;
     if (Object.keys(errors).length) return { ok: false, errors, current };
+
+    if (values.mapsInput) {
+      // The Maps link was resolved before the lock, for this very input. If the barcode changed under us in the
+      // meantime the answer may not fit any more: ask for a retry rather than guess.
+      if (!resolvedMaps?.ok || resolvedMaps.values.mapsInput !== values.mapsInput) {
+        return { ok: false, errors: { target_value: 'Barcode berubah saat diproses. Coba simpan lagi.' }, current };
+      }
+      const { targetUrl, mapsPlaceId, mapsSourceUrl } = resolvedMaps.values;
+      values = { ...values, targetUrl, mapsPlaceId, mapsSourceUrl };
+    }
 
     // The form has minute precision; an untouched expiry keeps its exact stored value (e.g. 23:59:59).
     const unchanged =

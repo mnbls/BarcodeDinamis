@@ -3,8 +3,6 @@
 
 {% block scripts %}<script src="/assets/js/charts.js?v={{ assetVersion }}" defer></script>{% endblock %}
 
-{% set typeIcons = { 'url': 'globe', 'whatsapp': 'whatsapp-logo', 'email': 'envelope-simple', 'phone': 'phone' } %}
-
 {% block content %}
 <nav class="crumbs" aria-label="Breadcrumb">
   <a href="/admin/barcodes">Semua Barcode</a>{{ icon('caret-right', 12) }}<span class="mono">{{ barcode.code }}</span>
@@ -15,6 +13,7 @@
   <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/qr.png?download=1">{{ icon('download-simple', 18) }} Download PNG</a>
   <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/qr.svg?download=1">{{ icon('download-simple', 18) }} Download SVG</a>
   <a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/print" target="_blank" rel="noopener">{{ icon('printer', 18) }} Print</a>
+  {% if barcode.target_type == 'maps_review' or not barcode.target_url %}<a class="btn btn--secondary" href="/admin/barcodes/{{ barcode.code }}/print?layout=card" target="_blank" rel="noopener">{{ icon('star', 18) }} Cetak kartu</a>{% endif %}
   {% if canWrite %}
   <form method="post" action="/admin/barcodes/{{ barcode.code }}/status">
     {{ hidden_csrf() }}
@@ -33,7 +32,11 @@
 {% if barcode.state == 'pending' %}
 <div class="alert alert--info mb-16" role="status">
   {{ icon('pencil-simple', 20) }}
+  {% if opensActivation %}
+  <div><strong>Menunggu aktivasi.</strong> Yang memindai QR ini dibawa ke halaman aktivasi untuk memasukkan link Google Maps, jadi tidak ada yang perlu dikirim. Setelah terisi, QR langsung mengarah ke halaman ulasan Google{% if canWrite %}. Tujuan juga bisa diisi lewat <a class="link" href="/admin/barcodes/{{ barcode.code }}/edit">form edit</a>{% endif %}.</div>
+  {% else %}
   <div><strong>Tujuan belum diisi.</strong> Pemindai melihat halaman "Barcode Belum Diisi" sampai tujuan diisi{% if canWrite %}, lewat <a class="link" href="/admin/barcodes/{{ barcode.code }}/edit">form edit</a> atau lewat <a class="link" href="#link-edit">link edit tanpa login</a>{% endif %}.</div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -49,10 +52,11 @@
   </div>
   <span class="flow__arrow">{{ icon('arrow-right', 18) }}</span>
   <div class="flow__step">
-    <span class="flow__icon">{{ icon(typeIcons[barcode.target_type] or 'globe', 20) }}</span>
+    <span class="flow__icon">{{ icon(targetTypeIcons[barcode.target_type] or 'globe', 20) }}</span>
     <div>
       <div class="flow__label">Tujuan saat ini (bisa diubah)</div>
       {% if barcode.target_url %}<div class="flow__value" title="{{ barcode.target_url }}">{{ barcode.target_url | displayUrl }}</div>
+      {% elif opensActivation %}<div class="flow__value">Halaman aktivasi (link edit)</div>
       {% else %}<div class="flow__value muted">Belum diisi</div>{% endif %}
     </div>
   </div>
@@ -94,6 +98,7 @@
             <button class="btn btn--danger btn--sm" type="submit" data-confirm data-confirm-variant="danger" data-confirm-title="Cabut link edit?" data-confirm-message="Link ini langsung tidak berlaku, jadi tidak ada lagi yang bisa mengubah tujuan lewat link tersebut. Anda tetap bisa mengedit barcode dari dashboard dan membuat link baru kapan saja." data-confirm-label="Ya, cabut link">{{ icon('x-circle', 16) }} Cabut link</button>
           </form>
         </div>
+        {% if opensActivation %}<p class="link-note">Selama tujuan belum diisi, memindai QR barcode ini membuka link ini, jadi tidak perlu dikirim terpisah.</p>{% endif %}
         <p class="link-note">Pemegang link hanya bisa mengubah tujuan. Nama, status, masa berlaku, statistik, dan penghapusan tetap milik admin. Setiap perubahan tercatat di riwayat dengan keterangan "Link edit". Bagikan hanya kepada orang yang dipercaya.</p>
         {% else %}
         <p class="link-note link-note--first">Barcode ini belum punya link edit. Buat satu bila ada orang lain yang perlu mengisi atau mengubah tujuannya tanpa login.</p>
@@ -122,6 +127,17 @@
             {% if barcode.target_url.startsWith('http') %}<a class="link text-sm" href="{{ barcode.target_url }}" target="_blank" rel="noopener noreferrer">Buka tujuan {{ icon('arrow-up-right', 12) }}</a>{% endif %}
             {% else %}<span class="muted">Belum diisi</span>{% endif %}
           </dd>
+          {% if barcode.target_type == 'maps_review' %}
+          <dt>Link Google Maps</dt>
+          <dd>
+            {% if barcode.maps_source_url %}
+            <div class="url-box"><span class="mono">{{ barcode.maps_source_url }}</span>{{ copy_button(barcode.maps_source_url, 'Salin link Maps', 'Link Maps disalin.') }}</div>
+            <a class="link text-sm" href="{{ barcode.maps_source_url }}" target="_blank" rel="noopener noreferrer">Cek lokasi {{ icon('arrow-up-right', 12) }}</a>
+            {% else %}<span class="muted">-</span>{% endif %}
+          </dd>
+          <dt>Place ID</dt>
+          <dd><div class="url-box"><span class="mono">{{ barcode.maps_place_id }}</span>{{ copy_button(barcode.maps_place_id, 'Salin Place ID', 'Place ID disalin.') }}</div></dd>
+          {% endif %}
           <dt>Status</dt><dd>{{ badge(barcode.state) }}</dd>
           <dt>Dibuat</dt><dd>{{ barcode.created_at | dt }}</dd>
           <dt>Diperbarui</dt><dd>{{ barcode.updated_at | dt }}</dd>

@@ -4,14 +4,20 @@
 //
 // Allowed final schemes: http(s) for websites/WhatsApp, and mailto:/tel: only when generated
 // here from validated input. javascript:, data:, file:, vbscript: etc. can never be produced.
+//
+// "maps_review" is the odd one out: the person pastes a Google Maps link and the destination becomes the review page
+// of that place. Turning the link into a Place ID may need the network (short links), so it cannot happen in this
+// synchronous, pure module: validateTarget only checks the pasted link, and the barcode service resolves it
+// (modules/maps/maps.resolver.js) before anything is stored.
 
-export const TARGET_TYPES = ['url', 'whatsapp', 'email', 'phone'];
+export const TARGET_TYPES = ['url', 'whatsapp', 'email', 'phone', 'maps_review'];
 
 export const TARGET_TYPE_LABELS = {
   url: 'Website / URL',
   whatsapp: 'WhatsApp',
   email: 'Email',
   phone: 'Telepon',
+  maps_review: 'Ulasan Google Maps',
 };
 
 /** Labels/help texts for the create/edit form (rendered into the page and used by barcodes.js). */
@@ -42,6 +48,13 @@ export const TARGET_TYPE_META = {
     placeholder: '0274123456',
     hint: 'Pemindai akan membuka aplikasi telepon dengan nomor ini. Awali 0 untuk nomor Indonesia.',
     inputmode: 'tel',
+    extra: null,
+  },
+  maps_review: {
+    label: 'Link Google Maps',
+    placeholder: 'https://maps.app.goo.gl/...',
+    hint: 'Tempel link lokasi dari Google Maps (Bagikan, lalu Salin link). Pemindai dibawa ke halaman ulasan Google untuk lokasi itu.',
+    inputmode: 'url',
     extra: null,
   },
 };
@@ -149,12 +162,19 @@ export function buildTarget(type, { value, extra } = {}, { appOrigin } = {}) {
       return { ok: true, targetUrl: `tel:+${digits}` };
     }
 
+    // Resolved by the barcode service (it may have to ask Google to expand a short link), never built here.
+    case 'maps_review':
+      return { ok: false, errors: { target_type: 'Tujuan Google Maps diproses terpisah.' } };
+
     default:
       return { ok: false, errors: { target_type: 'Tipe tujuan tidak dikenal.' } };
   }
 }
 
-/** Inverse of buildTarget, used to pre-fill the edit form from the stored URL. */
+/**
+ * Inverse of buildTarget, used to pre-fill the edit form from the stored URL.
+ * (A Maps destination is pre-filled from the link the person pasted, not from the review address: see formValuesFor.)
+ */
 export function parseTarget(type, targetUrl) {
   const url = String(targetUrl ?? '');
   try {

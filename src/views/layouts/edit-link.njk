@@ -1,18 +1,23 @@
 {% extends "layouts/public.njk" %}
 
-{# Shell of the public edit-link pages (the info page and the form page): brand, one narrow column, and the note
-   about the secret. Pages fill the "editContent" block. #}
+{# Shell of the public edit-link pages (the activation page and the form page): the card brand, one narrow column, and
+   the note about the secret. The person holding a card sees the BRAND_NAME (Riview Yuk), not the name of the admin
+   panel. Pages fill the "editContent" block. #}
+
+{% set siteName = app.brand %}
+
+{% block favicon %}<link rel="icon" href="/assets/img/favicon-riview.svg" type="image/svg+xml">{% endblock %}
 
 {% block content %}
 <div class="edit-page">
   <div class="edit-page__box">
     <div class="auth__brand">
-      <span class="pub-brand"><span class="pub-brand__mark">{{ icon('qr-code', 18) }}</span><span>{{ app.name }}</span></span>
+      <span class="pub-brand"><span class="pub-brand__mark pub-brand__mark--star">{{ icon('star-fill', 16) }}</span><span>{{ app.brand }}</span></span>
     </div>
 
     {% block editContent %}{% endblock %}
 
-    <p class="edit-page__foot">{{ icon('lock-simple', 14) }}<span>Link ini bersifat rahasia: siapa pun yang memilikinya dapat mengubah tujuan barcode ini, jadi jangan bagikan ke orang yang tidak dipercaya. Hanya tujuan yang bisa diubah, dan setiap perubahan tercatat.</span></p>
+    <p class="edit-page__foot">{{ icon('lock-simple', 14) }}<span>Link ini bersifat rahasia: siapa pun yang memilikinya dapat mengubah tujuan kartu ini, jadi jangan bagikan ke orang yang tidak dipercaya. Hanya tujuan yang bisa diubah, dan setiap perubahan tercatat.</span></p>
   </div>
 </div>
 {% endblock %}
